@@ -16,6 +16,7 @@ import {
   markFired,
 } from './lib/webHistory.js';
 import { createDashboardCharts } from './charts/dashboard.js';
+import { captureAnalysisRoot } from './lib/capture.js';
 
 const INTERVALS = [
   { id: '15m', label: '15 min' },
@@ -36,6 +37,7 @@ const LOOKBACK = {
 const app = document.querySelector('#app');
 
 app.innerHTML = `
+  <div id="capture-root">
   <header class="topbar">
     <div class="brand">
       <h1>HyperStrategy</h1>
@@ -61,9 +63,10 @@ app.innerHTML = `
         </select>
       </div>
       <button class="primary" id="reload" type="button">Actualiser</button>
+      <button class="secondary no-capture" id="capture" type="button">Capturer</button>
     </div>
   </header>
-  <p class="status" id="status">Chargement des actifs…</p>
+  <p class="status no-capture" id="status">Chargement des actifs…</p>
 
   <div class="layout">
     <div class="main-col">
@@ -146,6 +149,7 @@ app.innerHTML = `
       </section>
     </aside>
   </div>
+  </div>
 `;
 
 const els = {
@@ -154,6 +158,8 @@ const els = {
   assetSearch: document.getElementById('asset-search'),
   interval: document.getElementById('interval'),
   reload: document.getElementById('reload'),
+  capture: document.getElementById('capture'),
+  captureRoot: document.getElementById('capture-root'),
   pairTitle: document.getElementById('pair-title'),
   pairMeta: document.getElementById('pair-meta'),
   ohlc: document.getElementById('ohlc'),
@@ -364,6 +370,30 @@ async function loadChart() {
 els.reload.addEventListener('click', loadChart);
 els.interval.addEventListener('change', loadChart);
 els.asset.addEventListener('change', loadChart);
+
+els.capture.addEventListener('click', async () => {
+  if (loading) return;
+  const coin = els.asset.value.trim().toUpperCase() || 'ASSET';
+  const interval = els.interval.value;
+  const stamp = new Date()
+    .toISOString()
+    .slice(0, 16)
+    .replace('T', '_')
+    .replace(':', 'h');
+  const filename = `HyperStrategy_${coin}_${interval}_${stamp}.png`;
+
+  els.capture.disabled = true;
+  setStatus('Capture en cours…');
+  try {
+    await captureAnalysisRoot(els.captureRoot, { filename });
+    setStatus(`Capture enregistrée : ${filename} (aussi copiée si le navigateur le permet)`);
+  } catch (err) {
+    console.error(err);
+    setStatus(err.message || 'Échec de la capture', true);
+  } finally {
+    els.capture.disabled = false;
+  }
+});
 
 let searchTimer = null;
 els.assetSearch.addEventListener('input', () => {

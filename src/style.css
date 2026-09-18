@@ -159,6 +159,49 @@ button.primary:disabled {
   transform: none;
 }
 
+button.secondary {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 11px 16px;
+  background: var(--panel);
+  color: var(--ink);
+  font: 600 0.92rem 'Manrope', sans-serif;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+button.secondary:hover {
+  filter: brightness(0.98);
+  transform: translateY(-1px);
+}
+
+button.secondary:disabled {
+  opacity: 0.55;
+  cursor: wait;
+  transform: none;
+}
+
+/* Pendant la capture : masque les contrôles, force une largeur lisible */
+body.is-capturing .no-capture {
+  visibility: hidden !important;
+}
+
+#capture-root.capture-frame {
+  width: 1360px;
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 18px;
+  background:
+    radial-gradient(1200px 500px at 10% -10%, var(--bg-glow), transparent 60%),
+    radial-gradient(900px 400px at 90% 0%, #f0e8df, transparent 55%),
+    var(--bg);
+}
+
+#capture-root.capture-frame .layout {
+  grid-template-columns: minmax(0, 1.7fr) minmax(300px, 0.85fr);
+}
+
 .status {
   font-size: 0.85rem;
   color: var(--muted);
