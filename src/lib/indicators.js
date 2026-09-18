@@ -204,26 +204,23 @@ export function buildSupportResistance(candles) {
   };
 
   const rows = [];
-  ['R1', 'R2', 'R3'].forEach((name, i) => {
-    const L = resists[i];
+  // Affichage du haut vers le bas : R3 → R2 → R1 → S1 → S2 → S3
+  [
+    { name: 'R3', type: 'resistance', idx: 2 },
+    { name: 'R2', type: 'resistance', idx: 1 },
+    { name: 'R1', type: 'resistance', idx: 0 },
+    { name: 'S1', type: 'support', idx: 0 },
+    { name: 'S2', type: 'support', idx: 1 },
+    { name: 'S3', type: 'support', idx: 2 },
+  ].forEach(({ name, type, idx }) => {
+    const L = type === 'resistance' ? resists[idx] : supports[idx];
     rows.push({
       level: name,
-      type: 'resistance',
+      type,
       mid: L.mid,
       low: L.low,
       high: L.high,
-      description: describe(L, 'resistance', i),
-    });
-  });
-  ['S1', 'S2', 'S3'].forEach((name, i) => {
-    const L = supports[i];
-    rows.push({
-      level: name,
-      type: 'support',
-      mid: L.mid,
-      low: L.low,
-      high: L.high,
-      description: describe(L, 'support', i),
+      description: describe(L, type, idx),
     });
   });
   return { rows, atr: rangeAtr };
