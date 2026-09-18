@@ -63,6 +63,7 @@ app.innerHTML = `
         </select>
       </div>
       <button class="primary" id="reload" type="button">Actualiser</button>
+      <button class="secondary" id="reset-view" type="button">Recentrer</button>
       <button class="secondary no-capture" id="capture" type="button">Capturer</button>
     </div>
   </header>
@@ -158,6 +159,7 @@ const els = {
   assetSearch: document.getElementById('asset-search'),
   interval: document.getElementById('interval'),
   reload: document.getElementById('reload'),
+  resetView: document.getElementById('reset-view'),
   capture: document.getElementById('capture'),
   captureRoot: document.getElementById('capture-root'),
   pairTitle: document.getElementById('pair-title'),
@@ -368,6 +370,11 @@ async function loadChart() {
 }
 
 els.reload.addEventListener('click', loadChart);
+els.resetView.addEventListener('click', () => {
+  if (!charts) return;
+  charts.resetView();
+  setStatus('Vue recentrée sur la période récente');
+});
 els.interval.addEventListener('change', loadChart);
 els.asset.addEventListener('change', loadChart);
 
@@ -386,6 +393,10 @@ els.capture.addEventListener('click', async () => {
   setStatus('Capture en cours…');
   try {
     await captureAnalysisRoot(els.captureRoot, { filename });
+    if (charts) {
+      // La capture change la largeur : on recentre après
+      requestAnimationFrame(() => charts.resetView());
+    }
     setStatus(`Capture enregistrée : ${filename} (aussi copiée si le navigateur le permet)`);
   } catch (err) {
     console.error(err);

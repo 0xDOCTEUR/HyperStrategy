@@ -238,7 +238,37 @@ export function createDashboardCharts(containers) {
     macdLineSeries.setData(toLine(times, macdObj.line));
     macdSignalSeries.setData(toLine(times, macdObj.signal));
 
+    lastBarCount = times.length;
+    focusRecent();
+  }
+
+  let lastBarCount = 0;
+
+  /** Recentre la vue sur la période récente (lisible) */
+  function focusRecent(bars = 140) {
+    if (!lastBarCount) {
+      priceChart.timeScale().fitContent();
+      rsiChart.timeScale().fitContent();
+      macdChart.timeScale().fitContent();
+      return;
+    }
+    const padRight = 6;
+    const to = lastBarCount - 1 + padRight;
+    const from = Math.max(-padRight, lastBarCount - bars);
+    const range = { from, to };
+    priceChart.timeScale().setVisibleLogicalRange(range);
+    rsiChart.timeScale().setVisibleLogicalRange(range);
+    macdChart.timeScale().setVisibleLogicalRange(range);
+  }
+
+  function resetView() {
+    focusRecent(140);
+  }
+
+  function fitAll() {
     priceChart.timeScale().fitContent();
+    rsiChart.timeScale().fitContent();
+    macdChart.timeScale().fitContent();
   }
 
   function resize() {
@@ -265,6 +295,8 @@ export function createDashboardCharts(containers) {
   return {
     setData,
     resize,
+    resetView,
+    fitAll,
     destroy() {
       ro.disconnect();
       priceChart.remove();
