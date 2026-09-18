@@ -14,12 +14,21 @@ function esc(s) {
     .replace(/>/g, '&gt;');
 }
 
+/** Flèche selon la perf de la dernière bougie */
+function perfArrow(changePct) {
+  if (changePct == null || !Number.isFinite(changePct)) return '→';
+  if (changePct > 0.1) return '↑';
+  if (changePct < -0.1) return '↓';
+  return '→';
+}
+
 function formatCoinBlock(coin, a, retro) {
   const sign = a.changePct >= 0 ? '+' : '';
+  const arrow = perfArrow(a.changePct);
   const s1 = a.levelRows.find((r) => r.level === 'S1');
   const r1 = a.levelRows.find((r) => r.level === 'R1');
   const lines = [
-    `<b>${esc(coin)}</b>  ${fmt(a.price, a.digits)}  (${sign}${a.changePct.toFixed(2)}%)`,
+    `${arrow} <b>${esc(coin)}</b>  ${fmt(a.price, a.digits)}  (${sign}${a.changePct.toFixed(2)}%)`,
     `Biais : <b>${esc(a.bias)}</b>`,
     `RSI ${a.rsiNow != null ? a.rsiNow.toFixed(1) : '—'} · MM50 ${fmt(a.m50, a.digits)} · MM200 ${fmt(a.m200, a.digits)}`,
     `S1 ${s1 ? esc(s1.priceLabel) : '—'} · R1 ${r1 ? esc(r1.priceLabel) : '—'}`,
@@ -81,7 +90,7 @@ export async function buildReport({ assets, interval, persist = true }) {
   }
 
   const header = [
-    `📊 <b>HL Analyse — compte rendu</b>`,
+    `📊 <b>Doc_bot Analyse — compte rendu</b>`,
     `${esc(now)} (Paris) · horizon ${esc(interval)}`,
     ``,
   ].join('\n');
@@ -116,8 +125,9 @@ export async function buildAlertMessages({ assets, interval }) {
       const { events, summaryLines } = evaluateSincePrevious(prev, analysis, candles);
       const fresh = filterNewEvents(events);
       if (fresh.length) {
+        const arrow = perfArrow(analysis.changePct);
         const lines = [
-          `🚨 <b>Alarme ${esc(coin)}</b> · ${esc(now)}`,
+          `🚨 <b>Doc_bot Analyse — alarme</b> ${arrow} ${esc(coin)} · ${esc(now)}`,
           `Prix ${fmt(analysis.price, analysis.digits)} · biais ${esc(analysis.bias)}`,
           ``,
         ];

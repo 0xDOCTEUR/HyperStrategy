@@ -38,7 +38,7 @@ const app = document.querySelector('#app');
 app.innerHTML = `
   <header class="topbar">
     <div class="brand">
-      <h1>HL Analyse</h1>
+      <h1>Doc_bot Analyse</h1>
       <p>Lecture technique pour tous les perpétuels Hyperliquid</p>
     </div>
     <div class="controls">
