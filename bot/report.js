@@ -90,7 +90,7 @@ export async function buildReport({ assets, interval, persist = true }) {
   }
 
   const header = [
-    `📊 <b>Doc_bot Analyse — compte rendu</b>`,
+    `📊 <b>HyperStrategy — compte rendu</b>`,
     `${esc(now)} (Paris) · horizon ${esc(interval)}`,
     ``,
   ].join('\n');
@@ -127,7 +127,7 @@ export async function buildAlertMessages({ assets, interval }) {
       if (fresh.length) {
         const arrow = perfArrow(analysis.changePct);
         const lines = [
-          `🚨 <b>Doc_bot Analyse — alarme</b> ${arrow} ${esc(coin)} · ${esc(now)}`,
+          `🚨 <b>HyperStrategy — alarme</b> ${arrow} ${esc(coin)} · ${esc(now)}`,
           `Prix ${fmt(analysis.price, analysis.digits)} · biais ${esc(analysis.bias)}`,
           ``,
         ];

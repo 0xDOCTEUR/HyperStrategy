@@ -51,7 +51,7 @@ function parseCommand(text) {
 
 function helpText() {
   return [
-    `<b>Doc_bot Analyse — commandes</b>`,
+    `<b>HyperStrategy — commandes</b>`,
     ``,
     `/rapport — compte rendu des actifs suivis`,
     `/analyse BTC — analyse d’un actif`,
@@ -86,7 +86,7 @@ async function formatSingle(coin, interval) {
   const r1 = analysis.levelRows.find((r) => r.level === 'R1');
 
   const lines = [
-    `📊 <b>Doc_bot Analyse</b>`,
+    `📊 <b>HyperStrategy</b>`,
     `${arrow} <b>${esc(coin)}</b>  ${fmt(analysis.price, analysis.digits)}  (${sign}${analysis.changePct.toFixed(2)}%)`,
     `Biais : <b>${esc(analysis.bias)}</b>`,
     `RSI ${analysis.rsiNow != null ? analysis.rsiNow.toFixed(1) : '—'} · MM50 ${fmt(analysis.m50, analysis.digits)} · MM200 ${fmt(analysis.m200, analysis.digits)}`,
