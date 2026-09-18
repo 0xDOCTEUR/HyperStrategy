@@ -1,0 +1,39 @@
+name: Alarmes Telegram
+
+on:
+  # Toutes les 30 minutes (UTC)
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  alarmes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Vérifier confirmations / invalidations
+        run: npm run bot:alerts
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_ASSETS: BTC,ETH,SOL,HYPE
+          TELEGRAM_INTERVAL: 4h
+
+      - name: Sauver les alarmes déjà envoyées
+        run: |
+          git config user.name "hl-ta-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add data || true
+          git diff --staged --quiet || git commit -m "chore: alarmes $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push || true

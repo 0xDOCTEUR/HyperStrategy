@@ -1,0 +1,7 @@
+node_modules
+dist
+.DS_Store
+body.json
+candles.json
+*.local
+.env

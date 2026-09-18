@@ -1,0 +1,38 @@
+name: Compte rendu Telegram
+
+on:
+  schedule:
+    - cron: "0 */4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  envoyer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Envoyer le compte rendu (+ rétrospective)
+        run: npm run bot:once
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_ASSETS: BTC,ETH,SOL,HYPE
+          TELEGRAM_INTERVAL: 4h
+
+      - name: Sauver l’historique des analyses
+        run: |
+          git config user.name "hl-ta-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add data || true
+          git diff --staged --quiet || git commit -m "chore: historique analyses $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push || true
