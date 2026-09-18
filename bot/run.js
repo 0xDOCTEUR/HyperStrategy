@@ -1,6 +1,7 @@
 import { getBotConfig } from './config.js';
 import { buildReport, buildAlertMessages } from './report.js';
 import { sendTelegramMessage } from './telegram.js';
+import { processCommandsOnce, pollCommandsLoop } from './commands.js';
 
 function splitMessage(text, max) {
   if (text.length <= max) return [text];
@@ -34,7 +35,9 @@ async function runReport(cfg) {
     interval: cfg.interval,
   });
   const n = await sendText(cfg, text);
-  console.log(`[bot] Rapport envoyé (${n} msg). Nouvelles alarmes dans le rapport: ${alerts.length}`);
+  console.log(
+    `[bot] Rapport envoyé (${n} msg). Nouvelles alarmes dans le rapport: ${alerts.length}`,
+  );
 }
 
 async function runAlerts(cfg) {
@@ -56,6 +59,7 @@ async function runAlerts(cfg) {
 async function main() {
   const once = process.argv.includes('--once');
   const alertsOnly = process.argv.includes('--alerts');
+  const commandsOnly = process.argv.includes('--commands');
   const cfg = getBotConfig();
   const reportMs = Math.max(0.25, cfg.everyHours) * 60 * 60 * 1000;
   const alertEveryMin = Number(process.env.TELEGRAM_ALERT_EVERY_MIN || 30);
@@ -64,6 +68,12 @@ async function main() {
   console.log(
     `[bot] Chats ${cfg.chatIds.join(', ')} · rapport /${cfg.everyHours}h · alarmes /${alertEveryMin}min · ${cfg.assets.join(', ')}`,
   );
+
+  if (commandsOnly) {
+    const r = await processCommandsOnce(cfg);
+    console.log(`[bot] Commandes : ${r.handled} traitée(s) / ${r.seen} update(s)`);
+    return;
+  }
 
   if (alertsOnly) {
     try {
@@ -86,6 +96,8 @@ async function main() {
 
   if (once) return;
 
+  const listen = process.argv.includes('--listen');
+
   setInterval(async () => {
     try {
       await runReport(cfg);
@@ -103,8 +115,18 @@ async function main() {
   }, alertMs);
 
   console.log(
-    `[bot] En écoute. Rapport toutes les ${cfg.everyHours} h, alarmes toutes les ${alertEveryMin} min.`,
+    `[bot] Planifié : rapport /${cfg.everyHours}h, alarmes /${alertEveryMin}min`,
   );
+
+  if (listen) {
+    await pollCommandsLoop(cfg);
+    return;
+  }
+
+  // Garde le process vivant (rapports/alarmes). Les commandes Telegram
+  // sont traitées par GitHub Actions toutes les 5 min (npm run bot:commands).
+  console.log('[bot] Commandes : via GitHub (toutes les ~5 min) ou npm run bot:listen');
+  await new Promise(() => {});
 }
 
 main().catch((err) => {

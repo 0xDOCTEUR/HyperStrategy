@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "bot": "node bot/run.js",
     "bot:once": "node bot/run.js --once",
-    "bot:alerts": "node bot/run.js --alerts"
+    "bot:alerts": "node bot/run.js --alerts",
+    "bot:commands": "node bot/run.js --commands",
+    "bot:listen": "node bot/run.js --listen"
   },
   "dependencies": {
     "lightweight-charts": "^5.2.1"
