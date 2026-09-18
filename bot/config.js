@@ -29,7 +29,10 @@ export function loadEnv(filename = '.env') {
 export function getBotConfig() {
   loadEnv();
   const token = process.env.TELEGRAM_BOT_TOKEN?.trim();
-  const chatId = process.env.TELEGRAM_CHAT_ID?.trim();
+  const chatIds = (process.env.TELEGRAM_CHAT_ID || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
   const assets = (process.env.TELEGRAM_ASSETS || 'BTC,ETH,SOL,HYPE')
     .split(',')
     .map((s) => s.trim().toUpperCase())
@@ -39,7 +42,15 @@ export function getBotConfig() {
   const sendOnStart = process.env.TELEGRAM_SEND_ON_START !== '0';
 
   if (!token) throw new Error('Manque TELEGRAM_BOT_TOKEN dans .env');
-  if (!chatId) throw new Error('Manque TELEGRAM_CHAT_ID dans .env');
+  if (!chatIds.length) throw new Error('Manque TELEGRAM_CHAT_ID dans .env');
 
-  return { token, chatId, assets, interval, everyHours, sendOnStart };
+  return {
+    token,
+    chatId: chatIds[0],
+    chatIds,
+    assets,
+    interval,
+    everyHours,
+    sendOnStart,
+  };
 }

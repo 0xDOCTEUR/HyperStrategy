@@ -18,10 +18,13 @@ function splitMessage(text, max) {
 
 async function sendText(cfg, text) {
   const chunks = splitMessage(text, 4000);
-  for (const chunk of chunks) {
-    await sendTelegramMessage(cfg.token, cfg.chatId, chunk);
+  const targets = cfg.chatIds || [cfg.chatId];
+  for (const chatId of targets) {
+    for (const chunk of chunks) {
+      await sendTelegramMessage(cfg.token, chatId, chunk);
+    }
   }
-  return chunks.length;
+  return chunks.length * targets.length;
 }
 
 async function runReport(cfg) {
@@ -59,7 +62,7 @@ async function main() {
   const alertMs = Math.max(5, alertEveryMin) * 60 * 1000;
 
   console.log(
-    `[bot] Chat ${cfg.chatId} · rapport /${cfg.everyHours}h · alarmes /${alertEveryMin}min · ${cfg.assets.join(', ')}`,
+    `[bot] Chats ${cfg.chatIds.join(', ')} · rapport /${cfg.everyHours}h · alarmes /${alertEveryMin}min · ${cfg.assets.join(', ')}`,
   );
 
   if (alertsOnly) {
