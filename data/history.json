@@ -267,6 +267,44 @@
           "stop": 82268
         },
         "summary": "81,293 tient au-dessus de la pile de moyennes. Structure plutôt haussière. Biais : achat sur replis vers S1. Vente seulement sur rejet de R1."
+      },
+      {
+        "coin": "BTC",
+        "interval": "4h",
+        "at": 1789783333441,
+        "price": 81354,
+        "bias": "achat sur replis",
+        "bullScore": 6,
+        "rsiNow": 77.26944607200254,
+        "goldenCross": true,
+        "deathCross": false,
+        "above50": true,
+        "above200": true,
+        "levels": {
+          "S1": 79688.35714285714,
+          "S2": 76357.07142857143,
+          "S3": 71360.14285714286,
+          "R1": 81391,
+          "R2": 82268,
+          "R3": 91347.85714285714
+        },
+        "long": {
+          "entryLow": 79688.35714285714,
+          "entryHigh": 79919.69642857143,
+          "tp1": 81391,
+          "tp2": 82268,
+          "tp3": 91347.85714285714,
+          "stop": 76357.07142857143
+        },
+        "short": {
+          "entryLow": 81354,
+          "entryHigh": 81621.80357142857,
+          "tp1": 79688.35714285714,
+          "tp2": 76357.07142857143,
+          "tp3": 71360.14285714286,
+          "stop": 82268
+        },
+        "summary": "81,354 tient au-dessus de la pile de moyennes. Structure plutôt haussière. Biais : achat sur replis vers S1. Vente seulement sur rejet de R1."
       }
     ],
     "ETH::4h": [
@@ -421,6 +459,44 @@
           "stop": 2857.414285714286
         },
         "summary": "2,631 tient au-dessus de la pile de moyennes. Structure plutôt haussière. Biais : achat sur replis vers S1. Vente seulement sur rejet de R1."
+      },
+      {
+        "coin": "ETH",
+        "interval": "4h",
+        "at": 1789783333829,
+        "price": 2615.7,
+        "bias": "achat sur replis",
+        "bullScore": 6,
+        "rsiNow": 70.36414281631696,
+        "goldenCross": true,
+        "deathCross": false,
+        "above50": true,
+        "above200": true,
+        "levels": {
+          "S1": 2543.185714285714,
+          "S2": 2398.1571428571424,
+          "S3": 2180.614285714285,
+          "R1": 2615.5,
+          "R2": 2666.2,
+          "R3": 3050.7857142857147
+        },
+        "long": {
+          "entryLow": 2543.185714285714,
+          "entryHigh": 2553.2571428571423,
+          "tp1": 2615.5,
+          "tp2": 2666.2,
+          "tp3": 3050.7857142857147,
+          "stop": 2398.1571428571424
+        },
+        "short": {
+          "entryLow": 2615.7,
+          "entryHigh": 2621.542857142857,
+          "tp1": 2543.185714285714,
+          "tp2": 2398.1571428571424,
+          "tp3": 2180.614285714285,
+          "stop": 2666.2
+        },
+        "summary": "2,616 tient au-dessus de la pile de moyennes. Structure plutôt haussière. Biais : achat sur replis vers S1. Vente seulement sur rejet de R1."
       }
     ],
     "SOL::4h": [
@@ -575,6 +651,44 @@
           "stop": 125.3496
         },
         "summary": "113.34 tient au-dessus de la pile de moyennes. Structure plutôt haussière. Biais : achat sur replis vers S1. Vente seulement sur rejet de R1."
+      },
+      {
+        "coin": "SOL",
+        "interval": "4h",
+        "at": 1789783334395,
+        "price": 113.53,
+        "bias": "achat sur replis",
+        "bullScore": 6,
+        "rsiNow": 77.74252512678916,
+        "goldenCross": true,
+        "deathCross": false,
+        "above50": true,
+        "above200": true,
+        "levels": {
+          "S1": 109.59828571428572,
+          "S2": 101.73485714285715,
+          "S3": 89.93971428571432,
+          "R1": 117.46171428571428,
+          "R2": 125.32514285714285,
+          "R3": 137.1202857142857
+        },
+        "long": {
+          "entryLow": 109.59828571428572,
+          "entryHigh": 110.14435714285715,
+          "tp1": 117.46171428571428,
+          "tp2": 125.32514285714285,
+          "tp3": 137.1202857142857,
+          "stop": 101.73485714285715
+        },
+        "short": {
+          "entryLow": 116.91564285714286,
+          "entryHigh": 118.0077857142857,
+          "tp1": 109.59828571428572,
+          "tp2": 101.73485714285715,
+          "tp3": 89.93971428571432,
+          "stop": 125.32514285714285
+        },
+        "summary": "113.53 tient au-dessus de la pile de moyennes. Structure plutôt haussière. Biais : achat sur replis vers S1. Vente seulement sur rejet de R1."
       }
     ],
     "HYPE::4h": [
@@ -729,6 +843,44 @@
           "stop": 103.37798571428573
         },
         "summary": "91.56 tient au-dessus de la pile de moyennes. Structure plutôt haussière. Biais : achat sur replis vers S1. Vente seulement sur rejet de R1."
+      },
+      {
+        "coin": "HYPE",
+        "interval": "4h",
+        "at": 1789783335009,
+        "price": 93.368,
+        "bias": "achat sur replis",
+        "bullScore": 5,
+        "rsiNow": 85.4636133548785,
+        "goldenCross": true,
+        "deathCross": false,
+        "above50": true,
+        "above200": true,
+        "levels": {
+          "S1": 89.59018571428571,
+          "S2": 82.03455714285714,
+          "S3": 70.70111428571427,
+          "R1": 97.14581428571428,
+          "R2": 104.70144285714285,
+          "R3": 116.03488571428572
+        },
+        "long": {
+          "entryLow": 89.59018571428571,
+          "entryHigh": 90.11488214285714,
+          "tp1": 97.14581428571428,
+          "tp2": 104.70144285714285,
+          "tp3": 116.03488571428572,
+          "stop": 82.03455714285714
+        },
+        "short": {
+          "entryLow": 96.62111785714285,
+          "entryHigh": 97.67051071428571,
+          "tp1": 89.59018571428571,
+          "tp2": 82.03455714285714,
+          "tp3": 70.70111428571427,
+          "stop": 104.70144285714285
+        },
+        "summary": "93.37 tient au-dessus de la pile de moyennes. Structure plutôt haussière. Biais : achat sur replis vers S1. Vente seulement sur rejet de R1."
       }
     ]
   }
