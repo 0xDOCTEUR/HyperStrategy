@@ -41,17 +41,32 @@ function toLine(times, values) {
   return data;
 }
 
+/** Nombre de décimales selon l’ordre de grandeur du prix */
+function decimalsFor(value) {
+  const abs = Math.abs(Number(value) || 0);
+  if (abs >= 1000) return 0;
+  if (abs >= 1) return 2;
+  if (abs >= 0.1) return 3;
+  if (abs >= 0.01) return 4;
+  if (abs >= 0.001) return 5;
+  if (abs >= 0.0001) return 6;
+  if (abs >= 0.00001) return 7;
+  return 8;
+}
+
 /** Format d’échelle adapté aux petits prix (PUMP, etc.) */
 function priceFormatFor(value) {
-  const abs = Math.abs(Number(value) || 0);
-  let precision = 2;
-  if (abs >= 1000) precision = 0;
-  else if (abs >= 1) precision = 2;
-  else if (abs >= 0.01) precision = 4;
-  else if (abs >= 0.0001) precision = 6;
-  else precision = 8;
-  const minMove = Number(`1e-${precision}`);
+  const precision = decimalsFor(value);
+  const minMove = Math.pow(10, -precision);
   return { type: 'price', precision, minMove };
+}
+
+function priceFormatterFor(value) {
+  const d = decimalsFor(value);
+  return (price) => {
+    if (price == null || !Number.isFinite(price)) return '';
+    return price.toFixed(d);
+  };
 }
 
 export function createDashboardCharts(containers) {
@@ -375,8 +390,13 @@ export function createDashboardCharts(containers) {
     const times = candles.map((c) => c.time);
     const lastClose = candles[candles.length - 1]?.close ?? 1;
     const pf = priceFormatFor(lastClose);
+    const priceFmt = priceFormatterFor(lastClose);
 
-    // Axes / labels : assez de décimales pour les petits prix
+    // Formateur global d’axe (sinon LWC reste à 2 décimales → 0.00 sur PUMP)
+    priceChart.applyOptions({
+      localization: { priceFormatter: priceFmt },
+    });
+
     candleSeries.applyOptions({ priceFormat: pf });
     ma50Series.applyOptions({ priceFormat: pf });
     ma100Series.applyOptions({ priceFormat: pf });
@@ -386,7 +406,12 @@ export function createDashboardCharts(containers) {
     // MACD : souvent encore plus petit que le prix
     const macdSample =
       macdObj?.line?.find((v) => v != null && Number.isFinite(v)) ?? lastClose * 0.001;
-    const macdPf = priceFormatFor(Math.abs(macdSample) || lastClose * 0.001);
+    const macdAbs = Math.abs(macdSample) || lastClose * 0.001;
+    const macdPf = priceFormatFor(macdAbs);
+    const macdFmt = priceFormatterFor(macdAbs);
+    macdChart.applyOptions({
+      localization: { priceFormatter: macdFmt },
+    });
     macdHistSeries.applyOptions({ priceFormat: macdPf });
     macdLineSeries.applyOptions({ priceFormat: macdPf });
     macdSignalSeries.applyOptions({ priceFormat: macdPf });
