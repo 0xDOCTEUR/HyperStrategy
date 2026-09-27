@@ -613,7 +613,8 @@ function enrichTimes(pattern, candles) {
 function fmtP(n) {
   if (n == null || !Number.isFinite(n)) return '—';
   const abs = Math.abs(n);
-  const d = abs >= 1000 ? 0 : abs >= 1 ? 2 : 4;
+  const d =
+    abs >= 1000 ? 0 : abs >= 1 ? 2 : abs >= 0.01 ? 4 : abs >= 0.0001 ? 6 : 8;
   return n.toLocaleString('en-US', {
     minimumFractionDigits: d,
     maximumFractionDigits: d,

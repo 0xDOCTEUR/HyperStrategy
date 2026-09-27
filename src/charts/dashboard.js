@@ -41,6 +41,19 @@ function toLine(times, values) {
   return data;
 }
 
+/** Format d’échelle adapté aux petits prix (PUMP, etc.) */
+function priceFormatFor(value) {
+  const abs = Math.abs(Number(value) || 0);
+  let precision = 2;
+  if (abs >= 1000) precision = 0;
+  else if (abs >= 1) precision = 2;
+  else if (abs >= 0.01) precision = 4;
+  else if (abs >= 0.0001) precision = 6;
+  else precision = 8;
+  const minMove = Number(`1e-${precision}`);
+  return { type: 'price', precision, minMove };
+}
+
 export function createDashboardCharts(containers) {
   const priceChart = createChart(containers.price, {
     ...CHART_OPTS,
@@ -360,6 +373,24 @@ export function createDashboardCharts(containers) {
     patterns = [],
   }) {
     const times = candles.map((c) => c.time);
+    const lastClose = candles[candles.length - 1]?.close ?? 1;
+    const pf = priceFormatFor(lastClose);
+
+    // Axes / labels : assez de décimales pour les petits prix
+    candleSeries.applyOptions({ priceFormat: pf });
+    ma50Series.applyOptions({ priceFormat: pf });
+    ma100Series.applyOptions({ priceFormat: pf });
+    ma200Series.applyOptions({ priceFormat: pf });
+    trendSeries.applyOptions({ priceFormat: pf });
+
+    // MACD : souvent encore plus petit que le prix
+    const macdSample =
+      macdObj?.line?.find((v) => v != null && Number.isFinite(v)) ?? lastClose * 0.001;
+    const macdPf = priceFormatFor(Math.abs(macdSample) || lastClose * 0.001);
+    macdHistSeries.applyOptions({ priceFormat: macdPf });
+    macdLineSeries.applyOptions({ priceFormat: macdPf });
+    macdSignalSeries.applyOptions({ priceFormat: macdPf });
+
     candleSeries.setData(
       candles.map((c) => ({
         time: c.time,

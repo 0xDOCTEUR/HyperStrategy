@@ -73,7 +73,9 @@ export function buildAnalysis(candles, computed) {
   }
 
   const byName = Object.fromEntries(levels.rows.map((r) => [r.level, r]));
-  const digits = price >= 1000 ? 0 : price >= 1 ? 2 : 4;
+  // Assez de décimales pour les petits prix (ex. PUMP ~0.005)
+  const digits =
+    price >= 1000 ? 0 : price >= 1 ? 2 : price >= 0.01 ? 4 : price >= 0.0001 ? 6 : 8;
   const atrVal = levels.atr;
 
   const techBullets = [
