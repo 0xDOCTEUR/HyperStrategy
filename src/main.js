@@ -190,6 +190,8 @@ const PRIORITY = ['BTC', 'ETH', 'SOL', 'HYPE', 'BNB', 'XRP', 'DOGE', 'AVAX', 'LI
 let assets = [];
 let charts = null;
 let loading = false;
+let currentPatterns = [];
+let selectedPatternId = null;
 
 function sortAssets(list) {
   return [...list].sort((a, b) => {
@@ -267,11 +269,14 @@ function renderPanels(analysis, intervalLabel, retro, patterns = []) {
     els.patternList.innerHTML =
       '<li class="pattern-empty">Aucune figure claire détectée sur la fenêtre récente.</li>';
   } else {
-    els.patternList.innerHTML = patterns
-      .map((p) => {
-        const biasClass =
-          p.bias === 'haussier' ? 'bull' : p.bias === 'baissier' ? 'bear' : 'flat';
-        return `<li class="pattern-item ${biasClass}">
+    els.patternList.innerHTML = `
+      <li class="pattern-hint">Clique une figure pour l’afficher sur le graphique (reclique pour masquer).</li>
+      ${patterns
+        .map((p) => {
+          const biasClass =
+            p.bias === 'haussier' ? 'bull' : p.bias === 'baissier' ? 'bear' : 'flat';
+          const active = p.id === selectedPatternId ? ' is-active' : '';
+          return `<li class="pattern-item ${biasClass}${active}" data-pattern-id="${p.id}" role="button" tabindex="0">
           <div class="pattern-head">
             <strong>${p.name}</strong>
             <span class="pattern-score">${p.confidence}%</span>
@@ -279,8 +284,8 @@ function renderPanels(analysis, intervalLabel, retro, patterns = []) {
           <div class="pattern-meta">${p.bias} · ${p.status}</div>
           <div class="pattern-detail">${p.detail}</div>
         </li>`;
-      })
-      .join('');
+        })
+        .join('')}`;
   }
 
   els.longGrid.innerHTML = scenarioHtml(analysis.long);
@@ -364,6 +369,8 @@ async function loadChart() {
     const levels = buildSupportResistance(candles);
     const trendline = ascendingTrendline(candles);
     const patterns = detectChartPatterns(candles);
+    currentPatterns = patterns;
+    selectedPatternId = null;
 
     const computed = { ma50, ma100, ma200, rsiArr, macdObj, levels, trendline };
     charts.setData({ candles, ...computed, patterns });
@@ -407,6 +414,39 @@ els.resetView.addEventListener('click', () => {
   charts.resetView();
   setStatus('Vue recentrée sur la période récente');
 });
+
+els.patternList.addEventListener('click', (e) => {
+  const item = e.target.closest('.pattern-item[data-pattern-id]');
+  if (!item || !charts) return;
+  const id = item.dataset.patternId;
+  const pattern = currentPatterns.find((p) => p.id === id);
+  if (!pattern) return;
+
+  if (selectedPatternId === id) {
+    selectedPatternId = null;
+    charts.clearPatterns();
+    item.classList.remove('is-active');
+    setStatus('Figure masquée');
+    return;
+  }
+
+  selectedPatternId = id;
+  charts.showPattern(pattern);
+  els.patternList
+    .querySelectorAll('.pattern-item.is-active')
+    .forEach((el) => el.classList.remove('is-active'));
+  item.classList.add('is-active');
+  setStatus(`Figure affichée : ${pattern.name}`);
+});
+
+els.patternList.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const item = e.target.closest('.pattern-item[data-pattern-id]');
+  if (!item) return;
+  e.preventDefault();
+  item.click();
+});
+
 els.interval.addEventListener('change', loadChart);
 els.asset.addEventListener('change', loadChart);
 

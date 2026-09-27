@@ -382,6 +382,24 @@ body.is-capturing .no-capture {
   border-radius: 10px;
   background: #f3f5f7;
   border-left: 3px solid #b0893f;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.pattern-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(28, 36, 43, 0.08);
+}
+
+.pattern-item.is-active {
+  box-shadow: inset 0 0 0 2px rgba(28, 36, 43, 0.2);
+}
+
+.pattern-hint {
+  font-size: 0.8rem;
+  color: var(--muted);
+  font-style: italic;
+  padding: 0 2px;
 }
 
 .pattern-item.bull {

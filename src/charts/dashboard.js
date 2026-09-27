@@ -213,7 +213,7 @@ export function createDashboardCharts(containers) {
     const top = patterns[0];
     const color = colorForBias(top.bias);
 
-    // Lignes de la meilleure figure
+    // Lignes de la figure sélectionnée
     if (top.upperLine?.length >= 2) {
       const s = priceChart.addSeries(LineSeries, {
         color,
@@ -312,6 +312,33 @@ export function createDashboardCharts(containers) {
     patternMarkers.setMarkers(markers);
   }
 
+  function zoomToPattern(pattern) {
+    if (!pattern || !lastBarCount) return;
+    const idxs = (pattern.points || [])
+      .map((p) => p.index)
+      .filter((i) => Number.isFinite(i));
+    if (!idxs.length) return;
+    const min = Math.min(...idxs);
+    const max = Math.max(...idxs);
+    const pad = Math.max(8, Math.round((max - min) * 0.35));
+    const from = Math.max(-2, min - pad);
+    const to = Math.min(lastBarCount - 1 + 6, max + pad);
+    const range = { from, to };
+    priceChart.timeScale().setVisibleLogicalRange(range);
+    rsiChart.timeScale().setVisibleLogicalRange(range);
+    macdChart.timeScale().setVisibleLogicalRange(range);
+  }
+
+  /** Affiche une figure précise (ou efface si null) */
+  function showPattern(pattern) {
+    if (!pattern) {
+      clearPatterns();
+      return;
+    }
+    drawPatterns([pattern]);
+    zoomToPattern(pattern);
+  }
+
   function setData({
     candles,
     ma50,
@@ -360,7 +387,7 @@ export function createDashboardCharts(containers) {
       trendSeries.setData([]);
     }
 
-    drawPatterns(patterns);
+    drawPatterns([]); // les figures s’affichent au clic dans le panneau
 
     rsiSeries.setData(toLine(times, rsiArr));
     const rsiGuide = times
@@ -447,6 +474,8 @@ export function createDashboardCharts(containers) {
     resize,
     resetView,
     fitAll,
+    showPattern,
+    clearPatterns,
     destroy() {
       ro.disconnect();
       priceChart.remove();
