@@ -75,7 +75,7 @@ async function sendChunks(token, chatId, text) {
 }
 
 async function formatSingle(coin, interval) {
-  const { analysis, candles } = await analyzeCoin(coin, interval);
+  const { analysis, candles, patterns } = await analyzeCoin(coin, interval);
   const prev = getLastSnapshot(coin, interval);
   const retro = prev ? evaluateSincePrevious(prev, analysis, candles) : null;
   appendSnapshot(toSnapshot(coin, interval, analysis));
@@ -94,6 +94,16 @@ async function formatSingle(coin, interval) {
     `Achat : entrée ${esc(analysis.long.entry)} · stop ${esc(analysis.long.stop)} · TP1 ${esc(analysis.long.tp1)}`,
     `Vente : entrée ${esc(analysis.short.entry)} · stop ${esc(analysis.short.stop)} · TP1 ${esc(analysis.short.tp1)}`,
   ];
+
+  if (patterns?.length) {
+    lines.push('');
+    lines.push('<b>Figures</b>');
+    for (const p of patterns.slice(0, 2)) {
+      lines.push(
+        `📐 ${esc(p.name)} (${p.confidence}%) — ${esc(p.bias)} · ${esc(p.status)}`,
+      );
+    }
+  }
 
   if (retro?.summaryLines?.length) {
     lines.push('');

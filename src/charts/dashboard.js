@@ -3,6 +3,7 @@ import {
   CandlestickSeries,
   LineSeries,
   HistogramSeries,
+  createSeriesMarkers,
 } from 'lightweight-charts';
 
 const CHART_OPTS = {
@@ -154,6 +155,8 @@ export function createDashboardCharts(containers) {
   });
 
   const levelLines = [];
+  const patternSeries = [];
+  let patternMarkers = null;
 
   function clearLevels() {
     while (levelLines.length) {
@@ -174,7 +177,152 @@ export function createDashboardCharts(containers) {
     }
   }
 
-  function setData({ candles, ma50, ma100, ma200, rsiArr, macdObj, levels, trendline }) {
+  function clearPatterns() {
+    while (patternSeries.length) {
+      const s = patternSeries.pop();
+      try {
+        priceChart.removeSeries(s);
+      } catch {
+        /* ignore */
+      }
+    }
+    if (patternMarkers) {
+      try {
+        patternMarkers.setMarkers([]);
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  function colorForBias(bias) {
+    if (bias === 'haussier') return '#1f8a5b';
+    if (bias === 'baissier') return '#c44536';
+    return '#b0893f';
+  }
+
+  function drawPatterns(patterns = []) {
+    clearPatterns();
+    if (!patterns.length) return;
+
+    if (!patternMarkers) {
+      patternMarkers = createSeriesMarkers(candleSeries, []);
+    }
+
+    const markers = [];
+    const top = patterns[0];
+    const color = colorForBias(top.bias);
+
+    // Lignes de la meilleure figure
+    if (top.upperLine?.length >= 2) {
+      const s = priceChart.addSeries(LineSeries, {
+        color,
+        lineWidth: 2,
+        lineStyle: 2,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        title: top.name,
+      });
+      s.setData(
+        top.upperLine
+          .filter((p) => p.time != null)
+          .map((p) => ({ time: p.time, value: p.price })),
+      );
+      patternSeries.push(s);
+    }
+    if (top.lowerLine?.length >= 2) {
+      const s = priceChart.addSeries(LineSeries, {
+        color,
+        lineWidth: 2,
+        lineStyle: 2,
+        priceLineVisible: false,
+        lastValueVisible: false,
+      });
+      s.setData(
+        top.lowerLine
+          .filter((p) => p.time != null)
+          .map((p) => ({ time: p.time, value: p.price })),
+      );
+      patternSeries.push(s);
+    }
+
+    if (top.points?.length >= 2 && !top.upperLine) {
+      const s = priceChart.addSeries(LineSeries, {
+        color,
+        lineWidth: 2,
+        lineStyle: 0,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        title: top.name,
+      });
+      const pts = [...top.points]
+        .filter((p) => p.time != null)
+        .sort((a, b) => a.time - b.time);
+      s.setData(pts.map((p) => ({ time: p.time, value: p.price })));
+      patternSeries.push(s);
+    }
+
+    if (top.neckPoints?.length >= 2) {
+      const s = priceChart.addSeries(LineSeries, {
+        color: 'rgba(90, 101, 112, 0.85)',
+        lineWidth: 1,
+        lineStyle: 2,
+        priceLineVisible: false,
+        lastValueVisible: false,
+        title: 'Neckline',
+      });
+      s.setData(
+        top.neckPoints
+          .filter((p) => p.time != null)
+          .map((p) => ({ time: p.time, value: p.price })),
+      );
+      patternSeries.push(s);
+    } else if (top.neckline != null && top.points?.length) {
+      const times = top.points
+        .map((p) => p.time)
+        .filter(Boolean)
+        .sort((a, b) => a - b);
+      if (times.length >= 2) {
+        const s = priceChart.addSeries(LineSeries, {
+          color: 'rgba(90, 101, 112, 0.85)',
+          lineWidth: 1,
+          lineStyle: 2,
+          priceLineVisible: false,
+          lastValueVisible: false,
+          title: 'Neckline',
+        });
+        s.setData([
+          { time: times[0], value: top.neckline },
+          { time: times[times.length - 1], value: top.neckline },
+        ]);
+        patternSeries.push(s);
+      }
+    }
+
+    for (const p of top.points || []) {
+      if (p.time == null) continue;
+      markers.push({
+        time: p.time,
+        position: top.bias === 'baissier' ? 'aboveBar' : 'belowBar',
+        color,
+        shape: top.bias === 'baissier' ? 'arrowDown' : 'arrowUp',
+        text: p.label || top.name,
+      });
+    }
+    patternMarkers.setMarkers(markers);
+  }
+
+  function setData({
+    candles,
+    ma50,
+    ma100,
+    ma200,
+    rsiArr,
+    macdObj,
+    levels,
+    trendline,
+    patterns = [],
+  }) {
     const times = candles.map((c) => c.time);
     candleSeries.setData(
       candles.map((c) => ({
@@ -211,6 +359,8 @@ export function createDashboardCharts(containers) {
     } else {
       trendSeries.setData([]);
     }
+
+    drawPatterns(patterns);
 
     rsiSeries.setData(toLine(times, rsiArr));
     const rsiGuide = times

@@ -7,6 +7,7 @@ import {
   ascendingTrendline,
 } from '../src/lib/indicators.js';
 import { buildAnalysis } from '../src/lib/analysis.js';
+import { detectChartPatterns } from '../src/lib/patterns.js';
 
 export const LOOKBACK = {
   '15m': 500,
@@ -29,6 +30,7 @@ export async function analyzeCoin(coin, interval) {
   const macdObj = macd(closes, 12, 26, 9);
   const levels = buildSupportResistance(candles);
   const trendline = ascendingTrendline(candles);
+  const patterns = detectChartPatterns(candles);
   const analysis = buildAnalysis(candles, {
     ma50,
     ma100,
@@ -38,5 +40,5 @@ export async function analyzeCoin(coin, interval) {
     levels,
     trendline,
   });
-  return { analysis, candles };
+  return { analysis, candles, patterns };
 }

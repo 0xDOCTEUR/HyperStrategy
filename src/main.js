@@ -17,6 +17,7 @@ import {
 } from './lib/webHistory.js';
 import { createDashboardCharts } from './charts/dashboard.js';
 import { captureAnalysisRoot } from './lib/capture.js';
+import { detectChartPatterns } from './lib/patterns.js';
 
 const INTERVALS = [
   { id: '15m', label: '15 min' },
@@ -86,6 +87,7 @@ app.innerHTML = `
           <span><i style="background:#6b4ea3"></i>Tendance</span>
           <span><i style="background:var(--red)"></i>R1–R3</span>
           <span><i style="background:var(--green)"></i>S1–S3</span>
+          <span><i style="background:#b0893f"></i>Figures</span>
         </div>
         <div id="price-chart"></div>
       </section>
@@ -129,6 +131,10 @@ app.innerHTML = `
         <h2>Analyse technique</h2>
         <ul id="tech-list"></ul>
       </section>
+      <section class="panel side-card patterns">
+        <h2>Figures chartistes</h2>
+        <ul id="pattern-list" class="pattern-list"></ul>
+      </section>
       <section class="panel side-card long">
         <h2>Scénario achat</h2>
         <div class="scenario-grid" id="long-grid"></div>
@@ -169,6 +175,7 @@ const els = {
   macdValue: document.getElementById('macd-value'),
   levelsBody: document.getElementById('levels-body'),
   techList: document.getElementById('tech-list'),
+  patternList: document.getElementById('pattern-list'),
   longGrid: document.getElementById('long-grid'),
   shortGrid: document.getElementById('short-grid'),
   longNote: document.getElementById('long-note'),
@@ -232,7 +239,7 @@ function scenarioHtml(s) {
   `;
 }
 
-function renderPanels(analysis, intervalLabel, retro) {
+function renderPanels(analysis, intervalLabel, retro, patterns = []) {
   const cls = analysis.changePct >= 0 ? 'up' : 'down';
   const sign = analysis.changePct >= 0 ? '+' : '';
   els.pairTitle.textContent = `${els.asset.value.trim().toUpperCase()} / USD`;
@@ -255,6 +262,27 @@ function renderPanels(analysis, intervalLabel, retro) {
   els.techList.innerHTML = analysis.techBullets
     .map((b) => `<li>${b}</li>`)
     .join('');
+
+  if (!patterns.length) {
+    els.patternList.innerHTML =
+      '<li class="pattern-empty">Aucune figure claire détectée sur la fenêtre récente.</li>';
+  } else {
+    els.patternList.innerHTML = patterns
+      .map((p) => {
+        const biasClass =
+          p.bias === 'haussier' ? 'bull' : p.bias === 'baissier' ? 'bear' : 'flat';
+        return `<li class="pattern-item ${biasClass}">
+          <div class="pattern-head">
+            <strong>${p.name}</strong>
+            <span class="pattern-score">${p.confidence}%</span>
+          </div>
+          <div class="pattern-meta">${p.bias} · ${p.status}</div>
+          <div class="pattern-detail">${p.detail}</div>
+        </li>`;
+      })
+      .join('');
+  }
+
   els.longGrid.innerHTML = scenarioHtml(analysis.long);
   els.shortGrid.innerHTML = scenarioHtml(analysis.short);
   els.longNote.textContent = analysis.long.note;
@@ -335,9 +363,10 @@ async function loadChart() {
     const macdObj = macd(closes, 12, 26, 9);
     const levels = buildSupportResistance(candles);
     const trendline = ascendingTrendline(candles);
+    const patterns = detectChartPatterns(candles);
 
     const computed = { ma50, ma100, ma200, rsiArr, macdObj, levels, trendline };
-    charts.setData({ candles, ...computed });
+    charts.setData({ candles, ...computed, patterns });
 
     const analysis = buildAnalysis(candles, computed);
     const intervalLabel =
@@ -347,9 +376,12 @@ async function loadChart() {
     const retro = prev
       ? evaluateSincePrevious(prev, analysis, candles)
       : null;
-    renderPanels(analysis, intervalLabel, retro);
+    renderPanels(analysis, intervalLabel, retro, patterns);
     appendSnapshot(toSnapshot(coin, interval, analysis));
 
+    const patternHint = patterns.length
+      ? ` · figure : ${patterns[0].name}`
+      : '';
     const alertHint =
       retro && retro.events.length
         ? ` · ${retro.conf} conf. / ${retro.inv} inval.`
@@ -357,8 +389,8 @@ async function loadChart() {
     const known = assets.some((a) => a.name === coin);
     setStatus(
       known
-        ? `${coin} · ${candles.length} bougies · biais : ${analysis.bias}${alertHint}`
-        : `${coin} chargé · ${candles.length} bougies${alertHint}`,
+        ? `${coin} · ${candles.length} bougies · biais : ${analysis.bias}${patternHint}${alertHint}`
+        : `${coin} chargé · ${candles.length} bougies${patternHint}${alertHint}`,
     );
   } catch (err) {
     console.error(err);

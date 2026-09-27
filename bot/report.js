@@ -22,7 +22,7 @@ function perfArrow(changePct) {
   return '→';
 }
 
-function formatCoinBlock(coin, a, retro) {
+function formatCoinBlock(coin, a, retro, patterns = []) {
   const sign = a.changePct >= 0 ? '+' : '';
   const arrow = perfArrow(a.changePct);
   const s1 = a.levelRows.find((r) => r.level === 'S1');
@@ -35,6 +35,16 @@ function formatCoinBlock(coin, a, retro) {
     `Achat : entrée ${esc(a.long.entry)} · stop ${esc(a.long.stop)} · TP1 ${esc(a.long.tp1)}`,
     `Vente : entrée ${esc(a.short.entry)} · stop ${esc(a.short.stop)} · TP1 ${esc(a.short.tp1)}`,
   ];
+
+  if (patterns.length) {
+    lines.push('');
+    lines.push('<b>Figures</b>');
+    for (const p of patterns.slice(0, 2)) {
+      lines.push(
+        `📐 ${esc(p.name)} (${p.confidence}%) — ${esc(p.bias)} · ${esc(p.status)}`,
+      );
+    }
+  }
 
   if (retro?.summaryLines?.length) {
     lines.push('');
@@ -68,7 +78,7 @@ export async function buildReport({ assets, interval, persist = true }) {
 
   for (const coin of assets) {
     try {
-      const { analysis, candles } = await analyzeCoin(coin, interval);
+      const { analysis, candles, patterns } = await analyzeCoin(coin, interval);
       const prev = getLastSnapshot(coin, interval);
       const retro = prev
         ? evaluateSincePrevious(prev, analysis, candles)
@@ -78,7 +88,7 @@ export async function buildReport({ assets, interval, persist = true }) {
         for (const e of retro.events) allNewAlerts.push({ coin, ...e });
       }
 
-      blocks.push(formatCoinBlock(coin, analysis, retro));
+      blocks.push(formatCoinBlock(coin, analysis, retro, patterns));
 
       if (persist) {
         appendSnapshot(toSnapshot(coin, interval, analysis));

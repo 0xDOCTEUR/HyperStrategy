@@ -359,6 +359,67 @@ body.is-capturing .no-capture {
   border-left: 4px solid #b0893f;
 }
 
+.side-card.patterns {
+  background: linear-gradient(180deg, #faf6ef, #fff);
+  border-left: 4px solid #8a6a2f;
+}
+
+.pattern-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.pattern-empty {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.pattern-item {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f3f5f7;
+  border-left: 3px solid #b0893f;
+}
+
+.pattern-item.bull {
+  background: var(--green-soft);
+  border-left-color: var(--green);
+}
+
+.pattern-item.bear {
+  background: var(--red-soft);
+  border-left-color: var(--red);
+}
+
+.pattern-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.pattern-score {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.pattern-meta {
+  margin-top: 4px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-transform: capitalize;
+}
+
+.pattern-detail {
+  margin-top: 6px;
+  font-size: 0.84rem;
+  line-height: 1.35;
+}
+
 .retro-summary p {
   margin: 0 0 6px;
   font-size: 0.86rem;
