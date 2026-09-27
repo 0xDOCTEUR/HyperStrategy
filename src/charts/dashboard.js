@@ -155,6 +155,7 @@ export function createDashboardCharts(containers) {
 
   const levelLines = [];
   const patternSeries = [];
+  const patternPriceLines = [];
 
   function clearLevels() {
     while (levelLines.length) {
@@ -183,6 +184,19 @@ export function createDashboardCharts(containers) {
       } catch {
         /* ignore */
       }
+    }
+    while (patternPriceLines.length) {
+      const line = patternPriceLines.pop();
+      try {
+        candleSeries.removePriceLine(line);
+      } catch {
+        /* ignore */
+      }
+    }
+    try {
+      priceChart.timeScale().applyOptions({ rightOffset: 6 });
+    } catch {
+      /* ignore */
     }
   }
 
@@ -228,9 +242,8 @@ export function createDashboardCharts(containers) {
   }
 
   /**
-   * Un seul tracé style fiche (W/M/ETE + projection),
-   * + neckline et objectif en pointillés fins.
-   * Pas de boîte / canal sur les doubles sommets-creux.
+   * Un seul tracé style fiche (W/M/ETE + projection jusqu’à l’objectif),
+   * + neckline et ligne d’objectif.
    */
   function drawPatterns(patterns = []) {
     clearPatterns();
@@ -238,9 +251,9 @@ export function createDashboardCharts(containers) {
 
     const top = patterns[0];
     const accent = colorForBias(top.bias);
-    const dashed = top.projectionStyle === 'dashed' || !top.confirmed;
+    const dashed = !top.confirmed;
 
-    // 1) Tracé complet de la figure
+    // 1) Tracé complet jusqu’à l’objectif
     const path =
       top.trace?.length >= 2
         ? top.trace
@@ -253,11 +266,11 @@ export function createDashboardCharts(containers) {
       addOverlayLine(path, {
         color: accent,
         width: 3,
-        style: dashed && !top.confirmed ? 2 : 0,
+        style: dashed ? 2 : 0,
       });
     }
 
-    // 2) Bordures de canal (triangles / wedges uniquement)
+    // 2) Canal (triangles / wedges)
     if (top.overlayUpper?.length >= 2) {
       addOverlayLine(top.overlayUpper, { color: accent, width: 2, style: 0 });
     }
@@ -270,9 +283,33 @@ export function createDashboardCharts(containers) {
       addOverlayLine(top.neckPoints, { color: accent, width: 1, style: 2 });
     }
 
-    // 4) Objectif horizontal
+    // 4) Objectif : trait horizontal + label sur l’échelle
     if (top.targetLine?.length >= 2) {
       addOverlayLine(top.targetLine, { color: accent, width: 2, style: 2 });
+    }
+    if (Number.isFinite(top.targetPrice) || Number.isFinite(top.target)) {
+      const tp = top.targetPrice ?? top.target;
+      try {
+        const pl = candleSeries.createPriceLine({
+          price: tp,
+          color: accent,
+          lineWidth: 2,
+          lineStyle: 2,
+          axisLabelVisible: true,
+          title: 'Objectif',
+        });
+        patternPriceLines.push(pl);
+      } catch {
+        /* ignore */
+      }
+    }
+
+    // Espace vide à droite pour voir la projection
+    const pad = Math.max(12, top.rightPadBars || 12);
+    try {
+      priceChart.timeScale().applyOptions({ rightOffset: pad });
+    } catch {
+      /* ignore */
     }
   }
 
@@ -291,10 +328,10 @@ export function createDashboardCharts(containers) {
     if (!idxs.length) return;
     const min = Math.min(...idxs);
     const max = Math.max(...idxs);
-    const padLeft = Math.max(8, Math.round((max - min) * 0.2));
-    const padRight = Math.max(10, Math.round((max - min) * 0.25));
+    const padLeft = Math.max(8, Math.round((max - min) * 0.15));
+    const padRight = Math.max(pattern.rightPadBars || 14, 14);
     const from = Math.max(-2, min - padLeft);
-    const to = Math.max(lastBarCount - 1, max) + padRight;
+    const to = Math.max(lastBarCount - 1 + padRight, max + 2);
     const range = { from, to };
     priceChart.timeScale().setVisibleLogicalRange(range);
     rsiChart.timeScale().setVisibleLogicalRange(range);

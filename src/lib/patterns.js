@@ -45,8 +45,8 @@ function findBreakIndex(candles, fromIdx, neck, direction) {
 
 /**
  * Construit UN seul tracé style fiche :
- * formation (M/W/ETE…) puis jambe jusqu’à l’objectif,
- * collée à la figure — jamais un zig-zag séparé à droite.
+ * pivots de la figure, puis prolongation jusqu’à l’objectif
+ * (au-delà de la dernière bougie si pas encore atteint).
  */
 function withProjection(pattern, candles) {
   const last = candles.length - 1;
@@ -63,8 +63,8 @@ function withProjection(pattern, candles) {
   const confirmed = pattern.confirmed === true;
   const bullish = pattern.bias === 'haussier';
   const bearish = pattern.bias === 'baissier';
+  const price = candles[last].close;
 
-  // Tracé de base = pivots de la figure
   const trace = [...formation];
 
   if (
@@ -79,54 +79,45 @@ function withProjection(pattern, candles) {
       projection: null,
       projectionStyle: null,
       targetLine: null,
-      // Pas de boîte type canal sur les retournements
       overlayUpper: pattern.showChannel ? pattern.overlayUpper : null,
       overlayLower: pattern.showChannel ? pattern.overlayLower : null,
     };
   }
 
-  let cursor = end.index;
-
-  // 1) Point de cassure sur la neckline (juste après la formation)
-  if (neck != null && Number.isFinite(neck)) {
-    let breakIdx = null;
-    if (confirmed) {
-      breakIdx = findBreakIndex(candles, end.index + 1, neck, bullish ? 'up' : 'down');
-    }
-    if (breakIdx == null) {
-      breakIdx = end.index + Math.max(2, Math.round(span * 0.25));
-    }
-    // Évite de remonter/descendre si le dernier pivot est déjà la neckline
-    if (Math.abs(end.price - neck) > Math.abs(target - neck) * 0.03) {
-      cursor = breakIdx;
-      trace.push(node(cursor, neck, 'Cassure'));
-    } else {
-      cursor = Math.max(cursor, breakIdx);
+  // 1) Cassure / neckline après le dernier pivot
+  let breakIdx = end.index + Math.max(2, Math.round(span * 0.22));
+  if (confirmed && neck != null) {
+    const found = findBreakIndex(candles, end.index + 1, neck, bullish ? 'up' : 'down');
+    if (found != null) breakIdx = found;
+  }
+  if (neck != null && Number.isFinite(neck) && Math.abs(end.price - neck) > Math.abs(target - neck) * 0.03) {
+    // Ne pas coller la cassure sur la dernière bougie : on garde la géométrie
+    if (breakIdx >= last) breakIdx = Math.max(end.index + 2, last - 1);
+    if (breakIdx > end.index) {
+      trace.push(node(breakIdx, neck, 'Cassure'));
     }
   }
 
-  // 2) Objectif mesuré — dans le futur si la figure est récente / confirmée
-  const reach = Math.max(5, Math.round(span * 0.55));
-  let targetIdx = cursor + reach;
-  if (confirmed || end.index >= last - Math.max(3, Math.round(span * 0.2))) {
-    targetIdx = Math.max(targetIdx, last + Math.max(5, Math.round(span * 0.35)));
-  }
-  // Si le prix a déjà dépassé l’objectif, on arrête le tracé au prix actuel
-  if (bullish && candles[last].close >= target) {
-    trace.push(node(last, target, 'Objectif'));
-    targetIdx = last;
-  } else if (bearish && candles[last].close <= target) {
-    trace.push(node(last, target, 'Objectif'));
-    targetIdx = last;
-  } else {
-    trace.push(node(targetIdx, target, 'Objectif'));
+  // 2) Toujours prolonger jusqu’à l’objectif
+  const reached =
+    (bullish && price >= target) || (bearish && price <= target);
+
+  // Marge à droite : assez de bougies « futures » pour voir la projection
+  const futureBars = Math.max(12, Math.round(span * 0.5), 8);
+  const targetIdx = reached ? last : last + futureBars;
+
+  // Point intermédiaire au prix actuel (si on n’a pas encore l’objectif)
+  // pour que le tracé parte du présent vers la cible, sans zigzag parasite
+  if (!reached && Math.abs(price - (trace[trace.length - 1]?.price ?? price)) > Math.abs(target - price) * 0.02) {
+    if (last > (trace[trace.length - 1]?.index ?? -1)) {
+      trace.push(node(last, price, 'Maintenant'));
+    }
   }
 
-  // Neckline fine sur la durée de la formation uniquement
+  trace.push(node(targetIdx, target, 'Objectif'));
+
   const neckLine =
-    neck != null
-      ? [node(first.index, neck), node(end.index, neck)]
-      : null;
+    neck != null ? [node(first.index, neck), node(Math.max(end.index, breakIdx), neck)] : null;
 
   return {
     ...pattern,
@@ -138,9 +129,11 @@ function withProjection(pattern, candles) {
     overlayUpper: pattern.showChannel ? pattern.overlayUpper : null,
     overlayLower: pattern.showChannel ? pattern.overlayLower : null,
     targetLine: [
-      node(Math.max(end.index, cursor), target),
-      node(targetIdx + Math.max(2, Math.round(span * 0.12)), target),
+      node(last, target),
+      node(last + futureBars + 4, target),
     ],
+    targetPrice: target,
+    rightPadBars: futureBars + 6,
   };
 }
 
