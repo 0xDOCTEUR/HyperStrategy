@@ -43,6 +43,47 @@ function findBreakIndex(candles, fromIdx, neck, direction) {
   return null;
 }
 
+/** Objectif déjà atteint (ou dépassé) → figure terminée, plus à afficher. */
+function targetAlreadyHit(bias, price, target) {
+  if (target == null || !Number.isFinite(target)) return false;
+  if (bias === 'haussier') return price >= target;
+  if (bias === 'baissier') return price <= target;
+  return false;
+}
+
+/**
+ * Figure « usée » : objectif touché dans l’historique, ou cassure trop vieille
+ * alors que le prix est déjà loin de la zone utile.
+ */
+function isStalePattern(pattern, candles, price) {
+  if (targetAlreadyHit(pattern.bias, price, pattern.target)) return true;
+
+  const last = candles.length - 1;
+  const end = pattern.silhouette?.[pattern.silhouette.length - 1];
+  if (!end) return true;
+
+  // Confirmée mais trop ancienne (ex. double creux depuis longtemps sur 15m)
+  if (pattern.confirmed) {
+    const br = findBreakIndex(
+      candles,
+      end.index + 1,
+      pattern.neckline,
+      pattern.bias === 'haussier' ? 'up' : 'down',
+    );
+    const age = last - (br ?? end.index);
+    if (age > 48) return true;
+
+    // Prix déjà bien au-delà de l’objectif mesuré (même sans clôture exacte dessus)
+    if (pattern.target != null && pattern.neckline != null) {
+      const move = Math.abs(pattern.target - pattern.neckline);
+      if (pattern.bias === 'haussier' && price > pattern.target + move * 0.15) return true;
+      if (pattern.bias === 'baissier' && price < pattern.target - move * 0.15) return true;
+    }
+  }
+
+  return false;
+}
+
 /**
  * Construit UN seul tracé style fiche :
  * pivots de la figure, puis prolongation jusqu’à l’objectif
@@ -177,17 +218,21 @@ export function detectChartPatterns(candles) {
       // Invalidé si le prix a clairement dépassé les sommets
       const hiAfter = maxHighSince(candles, b.index + 1);
       const invalidated = hiAfter > topLevel + tol * 0.8;
+      const target = neckPx - height;
+      if (targetAlreadyHit('baissier', price, target)) continue;
+      if (minLowSince(candles, b.index + 1) <= target) continue;
+
       const confirmed = !invalidated && price < neckPx;
       const forming = !invalidated && !confirmed && price <= topLevel + tol * 0.3;
       if (!forming && !confirmed) continue;
-      // Trop vieux et toujours pas cassé → on ignore
       if (forming && last - b.index > 40) continue;
+      if (confirmed && last - b.index > 60) continue;
 
       const score =
         50 +
         Math.min(25, (height / atrVal) * 4) +
         (confirmed ? 20 : 8) +
-        Math.max(0, 12 - (last - b.index) * 0.25);
+        Math.max(0, 18 - (last - b.index) * 0.35);
 
       found.push({
         id: `dt-${a.index}-${b.index}`,
@@ -199,9 +244,9 @@ export function detectChartPatterns(candles) {
         status: confirmed ? 'cassé (confirmation)' : 'en formation / à surveiller',
         confidence: Math.min(96, Math.round(score)),
         neckline: neckPx,
-        target: neckPx - height,
+        target,
         detail: confirmed
-          ? `Neckline cassée vers ${fmtP(neckPx)}. Objectif potentiel ~${fmtP(neckPx - height)}.`
+          ? `Neckline cassée vers ${fmtP(neckPx)}. Objectif potentiel ~${fmtP(target)}.`
           : `Deux sommets proches. Une clôture sous ${fmtP(neckPx)} validerait la figure.`,
         points: [
           node(a.index, p1, 'S1'),
@@ -239,16 +284,22 @@ export function detectChartPatterns(candles) {
 
       const loAfter = minLowSince(candles, b.index + 1);
       const invalidated = loAfter < botLevel - tol * 0.8;
+      const target = neckPx + height;
+      // Objectif déjà dépassé → figure terminée, on ne la propose plus
+      if (targetAlreadyHit('haussier', price, target)) continue;
+      if (maxHighSince(candles, b.index + 1) >= target) continue;
+
       const confirmed = !invalidated && price > neckPx;
       const forming = !invalidated && !confirmed && price >= botLevel - tol * 0.3;
       if (!forming && !confirmed) continue;
       if (forming && last - b.index > 40) continue;
+      if (confirmed && last - b.index > 60) continue;
 
       const score =
         50 +
         Math.min(25, (height / atrVal) * 4) +
         (confirmed ? 20 : 8) +
-        Math.max(0, 12 - (last - b.index) * 0.25);
+        Math.max(0, 18 - (last - b.index) * 0.35);
 
       found.push({
         id: `db-${a.index}-${b.index}`,
@@ -260,9 +311,9 @@ export function detectChartPatterns(candles) {
         status: confirmed ? 'cassé (confirmation)' : 'en formation / à surveiller',
         confidence: Math.min(96, Math.round(score)),
         neckline: neckPx,
-        target: neckPx + height,
+        target,
         detail: confirmed
-          ? `Résistance ${fmtP(neckPx)} franchie. Objectif potentiel ~${fmtP(neckPx + height)}.`
+          ? `Résistance ${fmtP(neckPx)} franchie. Objectif potentiel ~${fmtP(target)}.`
           : `Deux creux proches. Une clôture au-dessus de ${fmtP(neckPx)} validerait la figure.`,
         points: [
           node(a.index, p1, 'C1'),
@@ -306,16 +357,22 @@ export function detectChartPatterns(candles) {
 
     const hiAfter = maxHighSince(candles, r.index + 1);
     const invalidated = hiAfter > hp + tol * 0.5;
+    const target = neck - height;
+    if (targetAlreadyHit('baissier', price, target)) continue;
+    if (minLowSince(candles, r.index + 1) <= target) continue;
+
     const confirmed = !invalidated && price < neck;
     const forming = !invalidated && !confirmed && price < hp;
     if (!forming && !confirmed) continue;
     if (forming && last - r.index > 40) continue;
+    if (confirmed && last - r.index > 60) continue;
 
     const score =
       55 +
       Math.min(20, (height / atrVal) * 3) +
       (confirmed ? 18 : 6) +
-      (near(lvP, rvP, tol * 1.2) ? 8 : 0);
+      (near(lvP, rvP, tol * 1.2) ? 8 : 0) +
+      Math.max(0, 10 - (last - r.index) * 0.2);
 
     found.push({
       id: `hs-${l.index}-${r.index}`,
@@ -327,9 +384,9 @@ export function detectChartPatterns(candles) {
       status: confirmed ? 'cassé (confirmation)' : 'en formation / à surveiller',
       confidence: Math.min(96, Math.round(score)),
       neckline: neck,
-      target: neck - height,
+      target,
       detail: confirmed
-        ? `Neckline cassée. Objectif potentiel ~${fmtP(neck - height)}.`
+        ? `Neckline cassée. Objectif potentiel ~${fmtP(target)}.`
         : `Tête au-dessus des épaules. Surveillance sous ${fmtP(neck)}.`,
       points: [
         node(l.index, lp, 'ÉG'),
@@ -374,16 +431,22 @@ export function detectChartPatterns(candles) {
 
     const loAfter = minLowSince(candles, r.index + 1);
     const invalidated = loAfter < hLo - tol * 0.5;
+    const target = neck + height;
+    if (targetAlreadyHit('haussier', price, target)) continue;
+    if (maxHighSince(candles, r.index + 1) >= target) continue;
+
     const confirmed = !invalidated && price > neck;
     const forming = !invalidated && !confirmed && price > hLo;
     if (!forming && !confirmed) continue;
     if (forming && last - r.index > 40) continue;
+    if (confirmed && last - r.index > 60) continue;
 
     const score =
       55 +
       Math.min(20, (height / atrVal) * 3) +
       (confirmed ? 18 : 6) +
-      (near(lpH, rpH, tol * 1.2) ? 8 : 0);
+      (near(lpH, rpH, tol * 1.2) ? 8 : 0) +
+      Math.max(0, 10 - (last - r.index) * 0.2);
 
     found.push({
       id: `ihs-${l.index}-${r.index}`,
@@ -395,9 +458,9 @@ export function detectChartPatterns(candles) {
       status: confirmed ? 'cassé (confirmation)' : 'en formation / à surveiller',
       confidence: Math.min(96, Math.round(score)),
       neckline: neck,
-      target: neck + height,
+      target,
       detail: confirmed
-        ? `Neckline franchie. Objectif potentiel ~${fmtP(neck + height)}.`
+        ? `Neckline franchie. Objectif potentiel ~${fmtP(target)}.`
         : `Creux central plus bas. Surveillance au-dessus de ${fmtP(neck)}.`,
       points: [
         node(l.index, lLo, 'ÉG'),
@@ -420,24 +483,30 @@ export function detectChartPatterns(candles) {
   const triangle = detectTriangle(candles, rh, rl, atrVal, price, last);
   if (triangle) found.push(triangle);
 
-  // Une seule figure par type, prioriser confirmées puis score
+  // Écarte les figures déjà jouées / trop vieilles
+  const fresh = found.filter((p) => !isStalePattern(p, candles, price));
+
+  // Une seule figure par type : plus récente, puis score
   const byKey = new Map();
-  for (const p of found) {
+  for (const p of fresh) {
     const prev = byKey.get(p.key);
     if (!prev) {
       byKey.set(p.key, p);
       continue;
     }
+    const pEnd = p.silhouette?.at(-1)?.index ?? 0;
+    const prevEnd = prev.silhouette?.at(-1)?.index ?? 0;
     const better =
+      pEnd - prevEnd ||
       Number(p.confirmed) - Number(prev.confirmed) ||
-      p.confidence - prev.confidence ||
-      (p.silhouette.at(-1)?.index ?? 0) - (prev.silhouette.at(-1)?.index ?? 0);
+      p.confidence - prev.confidence;
     if (better > 0) byKey.set(p.key, p);
   }
 
   return [...byKey.values()]
     .sort(
       (a, b) =>
+        (b.silhouette?.at(-1)?.index ?? 0) - (a.silhouette?.at(-1)?.index ?? 0) ||
         Number(b.confirmed) - Number(a.confirmed) ||
         b.confidence - a.confidence,
     )
@@ -546,6 +615,8 @@ function detectTriangle(candles, rh, rl, atrVal, price, last) {
     target = lower - height;
     neckline = lower;
   }
+  if (targetAlreadyHit(bias, price, target)) return null;
+  if (confirmed && last - endIdx > 48) return null;
 
   return {
     id: `${key}-${h1.index}-${l2.index}`,
