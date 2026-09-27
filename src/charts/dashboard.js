@@ -213,10 +213,10 @@ export function createDashboardCharts(containers) {
 
   /**
    * Overlay style fiche chartiste :
-   * - silhouette (tracé de la figure)
+   * - silhouette complète (formation + projection vers l’objectif)
    * - bordures haute/basse colorées
+   * - jambe de projection accentuée
    * - objectif en pointillés
-   * (pas de marqueurs fléchés)
    */
   function drawPatterns(patterns = []) {
     clearPatterns();
@@ -226,7 +226,7 @@ export function createDashboardCharts(containers) {
     const accent = colorForBias(top.bias);
     const silhouetteColor = 'rgba(28, 36, 43, 0.88)';
 
-    // 1) Silhouette de la figure (tracé principal)
+    // 1) Silhouette complète (formation + projection)
     const sil =
       top.silhouette?.length >= 2
         ? top.silhouette
@@ -242,13 +242,27 @@ export function createDashboardCharts(containers) {
       });
     }
 
-    // 2) Bordures / canaux (overlay coloré)
+    // 2) Jambe de projection colorée (vers l’objectif)
+    const proj =
+      top.projection?.length >= 2
+        ? top.projection
+        : null;
+    if (proj) {
+      addOverlayLine(proj, {
+        color: accent,
+        width: 3,
+        style: 0,
+        title: 'Projection',
+      });
+    }
+
+    // 3) Bordures / canaux (overlay coloré)
     const upper = top.overlayUpper?.length >= 2 ? top.overlayUpper : top.upperLine;
     const lower = top.overlayLower?.length >= 2 ? top.overlayLower : top.lowerLine;
     if (upper) {
       addOverlayLine(upper, {
         color: accent,
-        width: 3,
+        width: 2,
         style: 0,
         title: 'Bordure haute',
       });
@@ -256,7 +270,7 @@ export function createDashboardCharts(containers) {
     if (lower) {
       addOverlayLine(lower, {
         color: accent,
-        width: 3,
+        width: 2,
         style: 0,
         title: 'Bordure basse',
       });
@@ -268,16 +282,16 @@ export function createDashboardCharts(containers) {
       addOverlayLine(
         [
           { time: times[0], price: top.neckline },
-          { time: times[times.length - 1], price: top.neckline },
+          { time: times[Math.min(times.length - 1, Math.floor(times.length * 0.7))], price: top.neckline },
         ],
         { color: accent, width: 2, style: 2, title: 'Neckline' },
       );
     }
 
-    // 3) Objectif mesuré (pointillés)
+    // 4) Objectif mesuré (pointillés horizontaux)
     if (top.targetLine?.length >= 2) {
       addOverlayLine(top.targetLine, {
-        color: 'rgba(90, 101, 112, 0.75)',
+        color: accent,
         width: 2,
         style: 2,
         title: 'Objectif',
@@ -289,18 +303,21 @@ export function createDashboardCharts(containers) {
     if (!pattern || !lastBarCount) return;
     const idxs = [
       ...(pattern.silhouette || []),
+      ...(pattern.projection || []),
       ...(pattern.points || []),
       ...(pattern.overlayUpper || []),
       ...(pattern.overlayLower || []),
+      ...(pattern.targetLine || []),
     ]
       .map((p) => p.index)
       .filter((i) => Number.isFinite(i));
     if (!idxs.length) return;
     const min = Math.min(...idxs);
     const max = Math.max(...idxs);
-    const pad = Math.max(8, Math.round((max - min) * 0.35));
+    const pad = Math.max(10, Math.round((max - min) * 0.25));
     const from = Math.max(-2, min - pad);
-    const to = Math.min(lastBarCount - 1 + 6, max + pad);
+    // Autorise un peu d’espace « futur » pour voir la projection
+    const to = Math.max(lastBarCount - 1, max) + pad;
     const range = { from, to };
     priceChart.timeScale().setVisibleLogicalRange(range);
     rsiChart.timeScale().setVisibleLogicalRange(range);

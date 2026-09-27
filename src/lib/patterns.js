@@ -13,6 +13,55 @@ function node(index, price, label) {
 }
 
 /**
+ * Prolonge la silhouette jusqu’à l’objectif (cassure + projection),
+ * comme sur les fiches chartistes.
+ */
+function withProjection(pattern, last) {
+  const target = pattern.target;
+  if (target == null || !Number.isFinite(target)) return pattern;
+  const sil = pattern.silhouette;
+  if (!sil?.length) return pattern;
+
+  const first = sil[0];
+  const end = sil[sil.length - 1];
+  const span = Math.max(8, end.index - first.index);
+  const neck = pattern.neckline;
+  const bullish = pattern.bias === 'haussier';
+  const bearish = pattern.bias === 'baissier';
+
+  const proj = [];
+  let cursor = end.index;
+
+  // Point de cassure : neckline juste après la fin de la formation
+  if (neck != null && Number.isFinite(neck)) {
+    const needsBreak =
+      (bullish && end.price < neck - Math.abs(target - neck) * 0.02) ||
+      (bearish && end.price > neck + Math.abs(neck - target) * 0.02);
+    if (needsBreak) {
+      cursor = Math.max(cursor + 2, end.index + Math.max(3, Math.round(span * 0.2)));
+      proj.push(node(cursor, neck, 'Cassure'));
+    }
+  }
+
+  // Objectif mesuré un peu plus loin dans le temps (peut dépasser la dernière bougie)
+  cursor = Math.max(cursor + Math.max(6, Math.round(span * 0.55)), end.index + Math.max(8, Math.round(span * 0.7)));
+  // Garde un peu d’air après la dernière bougie visible
+  if (cursor <= last) cursor = last + Math.max(4, Math.round(span * 0.35));
+  proj.push(node(cursor, target, 'Objectif'));
+
+  const targetStartIdx = proj[0]?.index ?? end.index;
+  return {
+    ...pattern,
+    silhouette: [...sil, ...proj],
+    projection: [node(end.index, end.price), ...proj],
+    targetLine: [
+      node(targetStartIdx, target),
+      node(cursor + Math.max(4, Math.round(span * 0.2)), target),
+    ],
+  };
+}
+
+/**
  * Détecte des figures chartistes et prépare des overlays
  * (silhouette + bordures + neckline), style fiche chartiste.
  */
@@ -69,11 +118,12 @@ export function detectChartPatterns(candles) {
           node(trough.index, neck, 'N'),
           node(b.index, b.price, 'S2'),
         ],
-        // Overlay : silhouette M + résistance haute + neckline
+        // Overlay : M complet (descente vers neckline après S2)
         silhouette: [
           node(a.index, a.price),
           node(trough.index, neck),
           node(b.index, b.price),
+          node(Math.min(last, b.index + Math.max(3, Math.round((b.index - a.index) * 0.25))), neck),
         ],
         overlayUpper: [
           node(a.index, topLevel),
@@ -83,10 +133,7 @@ export function detectChartPatterns(candles) {
           node(a.index, neck),
           node(b.index, neck),
         ],
-        targetLine: [
-          node(b.index, neck - height),
-          node(Math.min(last, b.index + Math.max(8, b.index - a.index)), neck - height),
-        ],
+        targetLine: null,
       });
     }
   }
@@ -128,10 +175,12 @@ export function detectChartPatterns(candles) {
           node(peak.index, neck, 'N'),
           node(b.index, b.price, 'C2'),
         ],
+        // Overlay : W complet (remontée vers neckline après C2)
         silhouette: [
           node(a.index, a.price),
           node(peak.index, neck),
           node(b.index, b.price),
+          node(Math.min(last, b.index + Math.max(3, Math.round((b.index - a.index) * 0.25))), neck),
         ],
         overlayUpper: [
           node(a.index, neck),
@@ -141,10 +190,7 @@ export function detectChartPatterns(candles) {
           node(a.index, botLevel),
           node(b.index, botLevel),
         ],
-        targetLine: [
-          node(b.index, neck + height),
-          node(Math.min(last, b.index + Math.max(8, b.index - a.index)), neck + height),
-        ],
+        targetLine: null,
       });
     }
   }
@@ -194,16 +240,14 @@ export function detectChartPatterns(candles) {
         node(h.index, h.price),
         node(rv.index, rv.price),
         node(r.index, r.price),
+        node(Math.min(last, r.index + Math.max(3, Math.round((r.index - l.index) * 0.2))), neck),
       ],
       overlayUpper: null,
       overlayLower: [
         node(lv.index, neck),
         node(rv.index, neck),
       ],
-      targetLine: [
-        node(r.index, neck - height),
-        node(Math.min(last, r.index + Math.max(10, r.index - l.index)), neck - height),
-      ],
+      targetLine: null,
     });
   }
 
@@ -252,16 +296,14 @@ export function detectChartPatterns(candles) {
         node(h.index, h.price),
         node(rp.index, rp.price),
         node(r.index, r.price),
+        node(Math.min(last, r.index + Math.max(3, Math.round((r.index - l.index) * 0.2))), neck),
       ],
       overlayUpper: [
         node(lp.index, neck),
         node(rp.index, neck),
       ],
       overlayLower: null,
-      targetLine: [
-        node(r.index, neck + height),
-        node(Math.min(last, r.index + Math.max(10, r.index - l.index)), neck + height),
-      ],
+      targetLine: null,
     });
   }
 
@@ -277,6 +319,7 @@ export function detectChartPatterns(candles) {
   return [...byKey.values()]
     .sort((a, b) => b.confidence - a.confidence)
     .slice(0, 3)
+    .map((p) => withProjection(p, last))
     .map((p) => enrichTimes(p, candles));
 }
 
@@ -350,6 +393,19 @@ function detectTriangle(candles, rh, rl, atrVal, price, last) {
     node(l2.index, l2.price, 'B2'),
   ].sort((a, b) => a.index - b.index);
 
+  const height = Math.abs(upper - lower);
+  let target = null;
+  let neckline = bias === 'haussier' ? upper : lower;
+  if (bias === 'haussier' || brokenUp) {
+    target = upper + height;
+    neckline = upper;
+    if (bias === 'neutre' && brokenUp) bias = 'haussier';
+  } else if (bias === 'baissier' || brokenDown) {
+    target = lower - height;
+    neckline = lower;
+    if (bias === 'neutre' && brokenDown) bias = 'baissier';
+  }
+
   return {
     id: `${key}-${h1.index}-${l2.index}`,
     key,
@@ -357,9 +413,11 @@ function detectTriangle(candles, rh, rl, atrVal, price, last) {
     bias,
     status,
     confidence: Math.min(95, Math.round(score)),
-    neckline: bias === 'haussier' ? upper : lower,
-    target: null,
-    detail: `${name} entre ~${fmtP(lower)} et ~${fmtP(upper)}. ${status}.`,
+    neckline,
+    target,
+    detail: target
+      ? `${name} entre ~${fmtP(lower)} et ~${fmtP(upper)}. ${status}. Objectif potentiel ~${fmtP(target)}.`
+      : `${name} entre ~${fmtP(lower)} et ~${fmtP(upper)}. ${status}.`,
     points: swings,
     silhouette: swings,
     overlayUpper: [node(h1.index, h1.price), node(h2.index, h2.price)],
@@ -369,11 +427,27 @@ function detectTriangle(candles, rh, rl, atrVal, price, last) {
 }
 
 function enrichTimes(pattern, candles) {
+  const n = candles.length;
+  const step =
+    n >= 2 ? Math.max(1, candles[n - 1].time - candles[n - 2].time) : 3600;
+
+  const timeAt = (index) => {
+    if (index == null || !Number.isFinite(index)) return null;
+    if (candles[index]?.time != null) return candles[index].time;
+    if (index >= n && n > 0) {
+      return candles[n - 1].time + (index - (n - 1)) * step;
+    }
+    if (index < 0 && n > 0) {
+      return candles[0].time + index * step;
+    }
+    return null;
+  };
+
   const mapPts = (pts) =>
     (pts || [])
       .map((p) => ({
         ...p,
-        time: candles[p.index]?.time,
+        time: timeAt(p.index),
       }))
       .filter((p) => p.time != null);
 
@@ -381,6 +455,7 @@ function enrichTimes(pattern, candles) {
     ...pattern,
     points: mapPts(pattern.points),
     silhouette: mapPts(pattern.silhouette),
+    projection: mapPts(pattern.projection),
     overlayUpper: mapPts(pattern.overlayUpper),
     overlayLower: mapPts(pattern.overlayLower),
     targetLine: mapPts(pattern.targetLine),
