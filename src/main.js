@@ -87,9 +87,8 @@ app.innerHTML = `
           <span><i style="background:#6b4ea3"></i>Tendance</span>
           <span><i style="background:var(--red)"></i>R1–R3</span>
           <span><i style="background:var(--green)"></i>S1–S3</span>
-          <span><i style="background:#1c242b"></i>Tracé figure</span>
-          <span><i style="background:var(--green)"></i>Overlay haussier</span>
-          <span><i style="background:var(--red)"></i>Overlay baissier</span>
+          <span><i style="background:var(--green)"></i>Figure haussière</span>
+          <span><i style="background:var(--red)"></i>Figure baissière</span>
         </div>
         <div id="price-chart"></div>
       </section>

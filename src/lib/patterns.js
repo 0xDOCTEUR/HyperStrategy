@@ -44,69 +44,102 @@ function findBreakIndex(candles, fromIdx, neck, direction) {
 }
 
 /**
- * Projection uniquement si la figure est encore valable.
- * - cassée : trait plein depuis la cassure → objectif (vers le futur)
- * - en formation : pointillés depuis la dernière bougie → objectif (futur)
- * - invalidée : pas de projection
+ * Construit UN seul tracé style fiche :
+ * formation (M/W/ETE…) puis jambe jusqu’à l’objectif,
+ * collée à la figure — jamais un zig-zag séparé à droite.
  */
 function withProjection(pattern, candles) {
   const last = candles.length - 1;
-  if (pattern.invalidated || pattern.target == null || !Number.isFinite(pattern.target)) {
-    return { ...pattern, projection: null, targetLine: null, projectionStyle: null };
+  const formation = (pattern.silhouette || []).map((p) => ({ ...p }));
+  if (formation.length < 2) {
+    return { ...pattern, trace: null, projection: null, targetLine: null };
   }
-
-  const formation = pattern.silhouette;
-  if (!formation?.length) return pattern;
 
   const first = formation[0];
   const end = formation[formation.length - 1];
-  const span = Math.max(8, end.index - first.index);
+  const span = Math.max(6, end.index - first.index);
   const neck = pattern.neckline;
   const target = pattern.target;
   const confirmed = pattern.confirmed === true;
   const bullish = pattern.bias === 'haussier';
+  const bearish = pattern.bias === 'baissier';
 
-  const proj = [];
-  let startIdx = end.index;
-  let startPrice = end.price;
+  // Tracé de base = pivots de la figure
+  const trace = [...formation];
 
-  if (confirmed && neck != null) {
-    const br = findBreakIndex(candles, end.index, neck, bullish ? 'up' : 'down');
-    if (br != null) {
-      startIdx = br;
-      startPrice = candles[br].close;
-    }
-  } else {
-    // En formation : partir de la dernière bougie (pas à travers l’historique)
-    startIdx = last;
-    startPrice = candles[last].close;
-  }
-
-  proj.push(node(startIdx, startPrice));
-
-  // Passage neckline si on n’y est pas encore
-  let cursor = startIdx;
   if (
-    neck != null &&
-    Number.isFinite(neck) &&
-    Math.abs(startPrice - neck) > Math.abs(target - neck) * 0.04
+    pattern.invalidated ||
+    target == null ||
+    !Number.isFinite(target) ||
+    (pattern.bias !== 'haussier' && pattern.bias !== 'baissier')
   ) {
-    cursor = Math.max(startIdx + 2, last + 2);
-    proj.push(node(cursor, neck, 'Cassure'));
+    return {
+      ...pattern,
+      trace,
+      projection: null,
+      projectionStyle: null,
+      targetLine: null,
+      // Pas de boîte type canal sur les retournements
+      overlayUpper: pattern.showChannel ? pattern.overlayUpper : null,
+      overlayLower: pattern.showChannel ? pattern.overlayLower : null,
+    };
   }
 
-  // Objectif toujours dans le futur visible
-  cursor = Math.max(cursor + Math.max(5, Math.round(span * 0.45)), last + Math.max(6, Math.round(span * 0.35)));
-  proj.push(node(cursor, target, 'Objectif'));
+  let cursor = end.index;
+
+  // 1) Point de cassure sur la neckline (juste après la formation)
+  if (neck != null && Number.isFinite(neck)) {
+    let breakIdx = null;
+    if (confirmed) {
+      breakIdx = findBreakIndex(candles, end.index + 1, neck, bullish ? 'up' : 'down');
+    }
+    if (breakIdx == null) {
+      breakIdx = end.index + Math.max(2, Math.round(span * 0.25));
+    }
+    // Évite de remonter/descendre si le dernier pivot est déjà la neckline
+    if (Math.abs(end.price - neck) > Math.abs(target - neck) * 0.03) {
+      cursor = breakIdx;
+      trace.push(node(cursor, neck, 'Cassure'));
+    } else {
+      cursor = Math.max(cursor, breakIdx);
+    }
+  }
+
+  // 2) Objectif mesuré — dans le futur si la figure est récente / confirmée
+  const reach = Math.max(5, Math.round(span * 0.55));
+  let targetIdx = cursor + reach;
+  if (confirmed || end.index >= last - Math.max(3, Math.round(span * 0.2))) {
+    targetIdx = Math.max(targetIdx, last + Math.max(5, Math.round(span * 0.35)));
+  }
+  // Si le prix a déjà dépassé l’objectif, on arrête le tracé au prix actuel
+  if (bullish && candles[last].close >= target) {
+    trace.push(node(last, target, 'Objectif'));
+    targetIdx = last;
+  } else if (bearish && candles[last].close <= target) {
+    trace.push(node(last, target, 'Objectif'));
+    targetIdx = last;
+  } else {
+    trace.push(node(targetIdx, target, 'Objectif'));
+  }
+
+  // Neckline fine sur la durée de la formation uniquement
+  const neckLine =
+    neck != null
+      ? [node(first.index, neck), node(end.index, neck)]
+      : null;
 
   return {
     ...pattern,
+    trace,
     silhouette: formation,
-    projection: proj,
+    projection: null,
     projectionStyle: confirmed ? 'solid' : 'dashed',
+    neckPoints: neckLine,
+    overlayUpper: pattern.showChannel ? pattern.overlayUpper : null,
+    overlayLower: pattern.showChannel ? pattern.overlayLower : null,
     targetLine: [
-      node(proj[proj.length - 2]?.index ?? startIdx, target),
-      node(cursor + Math.max(2, Math.round(span * 0.1)), target),
+      node(Math.max(end.index, cursor), target),
+      node(targetIdx + Math.max(2, Math.round(span * 0.12)), target),
     ],
   };
 }
@@ -539,6 +572,7 @@ function detectTriangle(candles, rh, rl, atrVal, price, last) {
     silhouette: swings,
     overlayUpper: [node(h1.index, uh1), node(h2.index, uh2)],
     overlayLower: [node(l1.index, ul1), node(l2.index, ul2)],
+    showChannel: true,
     targetLine: null,
   };
 }
@@ -572,6 +606,7 @@ function enrichTimes(pattern, candles) {
     ...pattern,
     points: mapPts(pattern.points),
     silhouette: mapPts(pattern.silhouette),
+    trace: mapPts(pattern.trace),
     projection: mapPts(pattern.projection),
     overlayUpper: mapPts(pattern.overlayUpper),
     overlayLower: mapPts(pattern.overlayLower),

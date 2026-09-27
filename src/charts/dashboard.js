@@ -228,10 +228,9 @@ export function createDashboardCharts(containers) {
   }
 
   /**
-   * Overlay style fiche chartiste :
-   * - silhouette de formation (M / W / ETE…)
-   * - projection colorée jusqu’à l’objectif
-   * - bordures + objectif en pointillés
+   * Un seul tracé style fiche (W/M/ETE + projection),
+   * + neckline et objectif en pointillés fins.
+   * Pas de boîte / canal sur les doubles sommets-creux.
    */
   function drawPatterns(patterns = []) {
     clearPatterns();
@@ -239,69 +238,49 @@ export function createDashboardCharts(containers) {
 
     const top = patterns[0];
     const accent = colorForBias(top.bias);
-    const silhouetteColor = 'rgba(28, 36, 43, 0.92)';
-    const projDashed = top.projectionStyle === 'dashed';
+    const dashed = top.projectionStyle === 'dashed' || !top.confirmed;
 
-    // 1) Formation seule
-    const sil =
-      top.silhouette?.length >= 2
-        ? top.silhouette
-        : top.points?.length >= 2
-          ? top.points
-          : null;
-    if (sil) {
-      addOverlayLine(sil, {
-        color: silhouetteColor,
-        width: 4,
-        style: 0,
-      });
-    }
-
-    // 2) Projection formation → objectif (complète la figure)
-    if (top.projection?.length >= 2) {
-      addOverlayLine(top.projection, {
+    // 1) Tracé complet de la figure
+    const path =
+      top.trace?.length >= 2
+        ? top.trace
+        : top.silhouette?.length >= 2
+          ? top.silhouette
+          : top.points?.length >= 2
+            ? top.points
+            : null;
+    if (path) {
+      addOverlayLine(path, {
         color: accent,
         width: 3,
-        style: projDashed ? 2 : 0,
+        style: dashed && !top.confirmed ? 2 : 0,
       });
     }
 
-    // 3) Bordures / canaux
-    const upper = top.overlayUpper?.length >= 2 ? top.overlayUpper : top.upperLine;
-    const lower = top.overlayLower?.length >= 2 ? top.overlayLower : top.lowerLine;
-    if (upper) {
-      addOverlayLine(upper, { color: accent, width: 2, style: 0 });
+    // 2) Bordures de canal (triangles / wedges uniquement)
+    if (top.overlayUpper?.length >= 2) {
+      addOverlayLine(top.overlayUpper, { color: accent, width: 2, style: 0 });
     }
-    if (lower) {
-      addOverlayLine(lower, { color: accent, width: 2, style: 0 });
+    if (top.overlayLower?.length >= 2) {
+      addOverlayLine(top.overlayLower, { color: accent, width: 2, style: 0 });
     }
 
-    if (!upper && !lower && top.neckline != null && sil?.length >= 2) {
-      const ordered = [...sil].sort((a, b) => a.time - b.time);
-      addOverlayLine(
-        [
-          { time: ordered[0].time, price: top.neckline },
-          { time: ordered[ordered.length - 1].time, price: top.neckline },
-        ],
-        { color: accent, width: 2, style: 2 },
-      );
+    // 3) Neckline
+    if (top.neckPoints?.length >= 2) {
+      addOverlayLine(top.neckPoints, { color: accent, width: 1, style: 2 });
     }
 
     // 4) Objectif horizontal
     if (top.targetLine?.length >= 2) {
-      addOverlayLine(top.targetLine, {
-        color: accent,
-        width: 2,
-        style: 2,
-      });
+      addOverlayLine(top.targetLine, { color: accent, width: 2, style: 2 });
     }
   }
 
   function zoomToPattern(pattern) {
     if (!pattern || !lastBarCount) return;
     const idxs = [
+      ...(pattern.trace || []),
       ...(pattern.silhouette || []),
-      ...(pattern.projection || []),
       ...(pattern.points || []),
       ...(pattern.overlayUpper || []),
       ...(pattern.overlayLower || []),
@@ -312,8 +291,8 @@ export function createDashboardCharts(containers) {
     if (!idxs.length) return;
     const min = Math.min(...idxs);
     const max = Math.max(...idxs);
-    const padLeft = Math.max(6, Math.round((max - min) * 0.15));
-    const padRight = Math.max(8, Math.round((max - min) * 0.2));
+    const padLeft = Math.max(8, Math.round((max - min) * 0.2));
+    const padRight = Math.max(10, Math.round((max - min) * 0.25));
     const from = Math.max(-2, min - padLeft);
     const to = Math.max(lastBarCount - 1, max) + padRight;
     const range = { from, to };
