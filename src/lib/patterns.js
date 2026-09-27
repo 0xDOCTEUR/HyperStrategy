@@ -12,13 +12,49 @@ function node(index, price, label) {
   return { index, price, label };
 }
 
+/** Prix extrême (high/low) réel de la bougie, pour coller aux mèches. */
+function candleExt(candles, index, side) {
+  const c = candles[index];
+  if (!c) return null;
+  return side === 'high' ? c.high : c.low;
+}
+
 /**
- * Garde la formation intacte, puis ajoute une projection
- * juste après la figure → neckline → objectif (comme une fiche).
+ * Après la fin de figure : a-t-on clairement cassé dans le sens inverse ?
  */
-function withProjection(pattern, last) {
-  const target = pattern.target;
-  if (target == null || !Number.isFinite(target)) return pattern;
+function maxHighSince(candles, fromIdx) {
+  let m = -Infinity;
+  for (let i = fromIdx; i < candles.length; i++) m = Math.max(m, candles[i].high);
+  return m;
+}
+
+function minLowSince(candles, fromIdx) {
+  let m = Infinity;
+  for (let i = fromIdx; i < candles.length; i++) m = Math.min(m, candles[i].low);
+  return m;
+}
+
+/** Première bougie qui clôture au-delà de la neckline (dans le sens attendu). */
+function findBreakIndex(candles, fromIdx, neck, direction) {
+  for (let i = fromIdx; i < candles.length; i++) {
+    if (direction === 'down' && candles[i].close < neck) return i;
+    if (direction === 'up' && candles[i].close > neck) return i;
+  }
+  return null;
+}
+
+/**
+ * Projection uniquement si la figure est encore valable.
+ * - cassée : trait plein depuis la cassure → objectif (vers le futur)
+ * - en formation : pointillés depuis la dernière bougie → objectif (futur)
+ * - invalidée : pas de projection
+ */
+function withProjection(pattern, candles) {
+  const last = candles.length - 1;
+  if (pattern.invalidated || pattern.target == null || !Number.isFinite(pattern.target)) {
+    return { ...pattern, projection: null, targetLine: null, projectionStyle: null };
+  }
+
   const formation = pattern.silhouette;
   if (!formation?.length) return pattern;
 
@@ -26,45 +62,58 @@ function withProjection(pattern, last) {
   const end = formation[formation.length - 1];
   const span = Math.max(8, end.index - first.index);
   const neck = pattern.neckline;
-  const broken = /cassé|cassure/i.test(pattern.status || '');
+  const target = pattern.target;
+  const confirmed = pattern.confirmed === true;
+  const bullish = pattern.bias === 'haussier';
 
-  // Projection collée à la figure (pas étirée jusqu’à aujourd’hui)
-  const proj = [node(end.index, end.price)];
-  let cursor = end.index;
+  const proj = [];
+  let startIdx = end.index;
+  let startPrice = end.price;
 
-  if (neck != null && Number.isFinite(neck) && Math.abs(end.price - neck) > Math.abs(target - neck) * 0.05) {
-    cursor = end.index + Math.max(3, Math.round(span * 0.28));
+  if (confirmed && neck != null) {
+    const br = findBreakIndex(candles, end.index, neck, bullish ? 'up' : 'down');
+    if (br != null) {
+      startIdx = br;
+      startPrice = candles[br].close;
+    }
+  } else {
+    // En formation : partir de la dernière bougie (pas à travers l’historique)
+    startIdx = last;
+    startPrice = candles[last].close;
+  }
+
+  proj.push(node(startIdx, startPrice));
+
+  // Passage neckline si on n’y est pas encore
+  let cursor = startIdx;
+  if (
+    neck != null &&
+    Number.isFinite(neck) &&
+    Math.abs(startPrice - neck) > Math.abs(target - neck) * 0.04
+  ) {
+    cursor = Math.max(startIdx + 2, last + 2);
     proj.push(node(cursor, neck, 'Cassure'));
   }
 
-  cursor = cursor + Math.max(6, Math.round(span * 0.55));
+  // Objectif toujours dans le futur visible
+  cursor = Math.max(cursor + Math.max(5, Math.round(span * 0.45)), last + Math.max(6, Math.round(span * 0.35)));
   proj.push(node(cursor, target, 'Objectif'));
-
-  // Si la figure est récente, déborde un peu après la dernière bougie
-  // pour laisser voir l’objectif ; sinon reste dans l’historique.
-  if (end.index > last - Math.max(5, Math.round(span * 0.3))) {
-    const overflow = Math.max(4, Math.round(span * 0.35));
-    const lastProj = proj[proj.length - 1];
-    if (lastProj.index <= last) {
-      lastProj.index = last + overflow;
-    }
-  }
 
   return {
     ...pattern,
     silhouette: formation,
     projection: proj,
-    projectionStyle: broken ? 'solid' : 'dashed',
+    projectionStyle: confirmed ? 'solid' : 'dashed',
     targetLine: [
-      node(proj[proj.length - 2]?.index ?? end.index, target),
-      node(proj[proj.length - 1].index + Math.max(2, Math.round(span * 0.12)), target),
+      node(proj[proj.length - 2]?.index ?? startIdx, target),
+      node(cursor + Math.max(2, Math.round(span * 0.1)), target),
     ],
   };
 }
 
 /**
  * Détecte des figures chartistes et prépare des overlays
- * (silhouette + bordures + neckline), style fiche chartiste.
+ * (silhouette + bordures), seulement si encore cohérentes avec le prix.
  */
 export function detectChartPatterns(candles) {
   if (!candles || candles.length < 40) return [];
@@ -74,121 +123,133 @@ export function detectChartPatterns(candles) {
   const lookback = Math.min(3, Math.floor(candles.length / 40) || 3);
   const { highs, lows } = findSwingLevels(candles, lookback);
 
-  const minIdx = Math.max(0, candles.length - 150);
-  const rh = highs.filter((h) => h.index >= minIdx).slice(-10);
-  const rl = lows.filter((l) => l.index >= minIdx).slice(-10);
+  const minIdx = Math.max(0, candles.length - 120);
+  const rh = highs.filter((h) => h.index >= minIdx).slice(-8);
+  const rl = lows.filter((l) => l.index >= minIdx).slice(-8);
   const last = candles.length - 1;
   const price = candles[last].close;
 
   const found = [];
 
-  // —— Double sommet (forme en M)
+  // —— Double sommet (M)
   for (let i = 0; i < rh.length - 1; i++) {
     for (let j = i + 1; j < rh.length; j++) {
       const a = rh[i];
       const b = rh[j];
-      if (b.index - a.index < 5) continue;
+      if (b.index - a.index < 5 || b.index - a.index > 80) continue;
       if (!near(a.price, b.price, tol)) continue;
       const mid = between(rl, a.index, b.index);
       if (!mid.length) continue;
       const trough = mid.sort((x, y) => x.price - y.price)[0];
-      const neck = trough.price;
-      const height = (a.price + b.price) / 2 - neck;
-      if (height < atrVal * 1.1) continue;
-      const broken = price < neck;
+      const p1 = candleExt(candles, a.index, 'high') ?? a.price;
+      const p2 = candleExt(candles, b.index, 'high') ?? b.price;
+      const neckPx = candleExt(candles, trough.index, 'low') ?? trough.price;
+      const topLevel = (p1 + p2) / 2;
+      const height = topLevel - neckPx;
+      if (height < atrVal * 1.2) continue;
+
+      // Invalidé si le prix a clairement dépassé les sommets
+      const hiAfter = maxHighSince(candles, b.index + 1);
+      const invalidated = hiAfter > topLevel + tol * 0.8;
+      const confirmed = !invalidated && price < neckPx;
+      const forming = !invalidated && !confirmed && price <= topLevel + tol * 0.3;
+      if (!forming && !confirmed) continue;
+      // Trop vieux et toujours pas cassé → on ignore
+      if (forming && last - b.index > 40) continue;
+
       const score =
-        55 +
+        50 +
         Math.min(25, (height / atrVal) * 4) +
-        (broken ? 15 : 0) +
-        Math.max(0, 10 - (last - b.index) * 0.15);
-      const topLevel = (a.price + b.price) / 2;
+        (confirmed ? 20 : 8) +
+        Math.max(0, 12 - (last - b.index) * 0.25);
+
       found.push({
         id: `dt-${a.index}-${b.index}`,
         key: 'double_top',
         name: 'Double sommet',
         bias: 'baissier',
-        status: broken ? 'cassé (confirmation)' : 'en formation / à surveiller',
-        confidence: Math.min(98, Math.round(score)),
-        neckline: neck,
-        target: neck - height,
-        detail: broken
-          ? `Neckline cassée vers ${fmtP(neck)}. Objectif potentiel ~${fmtP(neck - height)}.`
-          : `Deux sommets proches. Une clôture sous ${fmtP(neck)} validerait la figure.`,
+        confirmed,
+        invalidated: false,
+        status: confirmed ? 'cassé (confirmation)' : 'en formation / à surveiller',
+        confidence: Math.min(96, Math.round(score)),
+        neckline: neckPx,
+        target: neckPx - height,
+        detail: confirmed
+          ? `Neckline cassée vers ${fmtP(neckPx)}. Objectif potentiel ~${fmtP(neckPx - height)}.`
+          : `Deux sommets proches. Une clôture sous ${fmtP(neckPx)} validerait la figure.`,
         points: [
-          node(a.index, a.price, 'S1'),
-          node(trough.index, neck, 'N'),
-          node(b.index, b.price, 'S2'),
+          node(a.index, p1, 'S1'),
+          node(trough.index, neckPx, 'N'),
+          node(b.index, p2, 'S2'),
         ],
-        // Formation M (les 3 pivots) — la projection ajoute la suite
         silhouette: [
-          node(a.index, a.price),
-          node(trough.index, neck),
-          node(b.index, b.price),
+          node(a.index, p1),
+          node(trough.index, neckPx),
+          node(b.index, p2),
         ],
-        overlayUpper: [
-          node(a.index, topLevel),
-          node(b.index, topLevel),
-        ],
-        overlayLower: [
-          node(trough.index, neck),
-          node(b.index, neck),
-        ],
+        overlayUpper: [node(a.index, topLevel), node(b.index, topLevel)],
+        overlayLower: [node(trough.index, neckPx), node(b.index, neckPx)],
         targetLine: null,
       });
     }
   }
 
-  // —— Double creux (forme en W)
+  // —— Double creux (W)
   for (let i = 0; i < rl.length - 1; i++) {
     for (let j = i + 1; j < rl.length; j++) {
       const a = rl[i];
       const b = rl[j];
-      if (b.index - a.index < 5) continue;
+      if (b.index - a.index < 5 || b.index - a.index > 80) continue;
       if (!near(a.price, b.price, tol)) continue;
       const mid = between(rh, a.index, b.index);
       if (!mid.length) continue;
       const peak = mid.sort((x, y) => y.price - x.price)[0];
-      const neck = peak.price;
-      const height = neck - (a.price + b.price) / 2;
-      if (height < atrVal * 1.1) continue;
-      const broken = price > neck;
+      const p1 = candleExt(candles, a.index, 'low') ?? a.price;
+      const p2 = candleExt(candles, b.index, 'low') ?? b.price;
+      const neckPx = candleExt(candles, peak.index, 'high') ?? peak.price;
+      const botLevel = (p1 + p2) / 2;
+      const height = neckPx - botLevel;
+      if (height < atrVal * 1.2) continue;
+
+      const loAfter = minLowSince(candles, b.index + 1);
+      const invalidated = loAfter < botLevel - tol * 0.8;
+      const confirmed = !invalidated && price > neckPx;
+      const forming = !invalidated && !confirmed && price >= botLevel - tol * 0.3;
+      if (!forming && !confirmed) continue;
+      if (forming && last - b.index > 40) continue;
+
       const score =
-        55 +
+        50 +
         Math.min(25, (height / atrVal) * 4) +
-        (broken ? 15 : 0) +
-        Math.max(0, 10 - (last - b.index) * 0.15);
-      const botLevel = (a.price + b.price) / 2;
+        (confirmed ? 20 : 8) +
+        Math.max(0, 12 - (last - b.index) * 0.25);
+
       found.push({
         id: `db-${a.index}-${b.index}`,
         key: 'double_bottom',
         name: 'Double creux',
         bias: 'haussier',
-        status: broken ? 'cassé (confirmation)' : 'en formation / à surveiller',
-        confidence: Math.min(98, Math.round(score)),
-        neckline: neck,
-        target: neck + height,
-        detail: broken
-          ? `Résistance ${fmtP(neck)} franchie. Objectif potentiel ~${fmtP(neck + height)}.`
-          : `Deux creux proches. Une clôture au-dessus de ${fmtP(neck)} validerait la figure.`,
+        confirmed,
+        invalidated: false,
+        status: confirmed ? 'cassé (confirmation)' : 'en formation / à surveiller',
+        confidence: Math.min(96, Math.round(score)),
+        neckline: neckPx,
+        target: neckPx + height,
+        detail: confirmed
+          ? `Résistance ${fmtP(neckPx)} franchie. Objectif potentiel ~${fmtP(neckPx + height)}.`
+          : `Deux creux proches. Une clôture au-dessus de ${fmtP(neckPx)} validerait la figure.`,
         points: [
-          node(a.index, a.price, 'C1'),
-          node(peak.index, neck, 'N'),
-          node(b.index, b.price, 'C2'),
+          node(a.index, p1, 'C1'),
+          node(peak.index, neckPx, 'N'),
+          node(b.index, p2, 'C2'),
         ],
-        // Formation W (les 3 pivots) — la projection ajoute la suite
         silhouette: [
-          node(a.index, a.price),
-          node(peak.index, neck),
-          node(b.index, b.price),
+          node(a.index, p1),
+          node(peak.index, neckPx),
+          node(b.index, p2),
         ],
-        overlayUpper: [
-          node(peak.index, neck),
-          node(b.index, neck),
-        ],
-        overlayLower: [
-          node(a.index, botLevel),
-          node(b.index, botLevel),
-        ],
+        overlayUpper: [node(peak.index, neckPx), node(b.index, neckPx)],
+        overlayLower: [node(a.index, botLevel), node(b.index, botLevel)],
         targetLine: null,
       });
     }
@@ -207,44 +268,57 @@ export function detectChartPatterns(candles) {
     if (!leftValley.length || !rightValley.length) continue;
     const lv = leftValley.sort((x, y) => x.price - y.price)[0];
     const rv = rightValley.sort((x, y) => x.price - y.price)[0];
-    const neck = (lv.price + rv.price) / 2;
-    const height = h.price - neck;
+
+    const lp = candleExt(candles, l.index, 'high') ?? l.price;
+    const hp = candleExt(candles, h.index, 'high') ?? h.price;
+    const rp = candleExt(candles, r.index, 'high') ?? r.price;
+    const lvP = candleExt(candles, lv.index, 'low') ?? lv.price;
+    const rvP = candleExt(candles, rv.index, 'low') ?? rv.price;
+    const neck = (lvP + rvP) / 2;
+    const height = hp - neck;
     if (height < atrVal * 1.3) continue;
-    const broken = price < neck;
+
+    const hiAfter = maxHighSince(candles, r.index + 1);
+    const invalidated = hiAfter > hp + tol * 0.5;
+    const confirmed = !invalidated && price < neck;
+    const forming = !invalidated && !confirmed && price < hp;
+    if (!forming && !confirmed) continue;
+    if (forming && last - r.index > 40) continue;
+
     const score =
-      60 +
+      55 +
       Math.min(20, (height / atrVal) * 3) +
-      (broken ? 15 : 0) +
-      (near(lv.price, rv.price, tol * 1.2) ? 8 : 0);
+      (confirmed ? 18 : 6) +
+      (near(lvP, rvP, tol * 1.2) ? 8 : 0);
+
     found.push({
       id: `hs-${l.index}-${r.index}`,
       key: 'head_shoulders',
       name: 'Épaule-tête-épaule',
       bias: 'baissier',
-      status: broken ? 'cassé (confirmation)' : 'en formation / à surveiller',
-      confidence: Math.min(98, Math.round(score)),
+      confirmed,
+      invalidated: false,
+      status: confirmed ? 'cassé (confirmation)' : 'en formation / à surveiller',
+      confidence: Math.min(96, Math.round(score)),
       neckline: neck,
       target: neck - height,
-      detail: broken
+      detail: confirmed
         ? `Neckline cassée. Objectif potentiel ~${fmtP(neck - height)}.`
         : `Tête au-dessus des épaules. Surveillance sous ${fmtP(neck)}.`,
       points: [
-        node(l.index, l.price, 'ÉG'),
-        node(h.index, h.price, 'T'),
-        node(r.index, r.price, 'ÉD'),
+        node(l.index, lp, 'ÉG'),
+        node(h.index, hp, 'T'),
+        node(r.index, rp, 'ÉD'),
       ],
       silhouette: [
-        node(l.index, l.price),
-        node(lv.index, lv.price),
-        node(h.index, h.price),
-        node(rv.index, rv.price),
-        node(r.index, r.price),
+        node(l.index, lp),
+        node(lv.index, lvP),
+        node(h.index, hp),
+        node(rv.index, rvP),
+        node(r.index, rp),
       ],
       overlayUpper: null,
-      overlayLower: [
-        node(lv.index, neck),
-        node(rv.index, neck),
-      ],
+      overlayLower: [node(lv.index, neck), node(rv.index, neck)],
       targetLine: null,
     });
   }
@@ -262,43 +336,56 @@ export function detectChartPatterns(candles) {
     if (!leftPeak.length || !rightPeak.length) continue;
     const lp = leftPeak.sort((x, y) => y.price - x.price)[0];
     const rp = rightPeak.sort((x, y) => y.price - x.price)[0];
-    const neck = (lp.price + rp.price) / 2;
-    const height = neck - h.price;
+
+    const lLo = candleExt(candles, l.index, 'low') ?? l.price;
+    const hLo = candleExt(candles, h.index, 'low') ?? h.price;
+    const rLo = candleExt(candles, r.index, 'low') ?? r.price;
+    const lpH = candleExt(candles, lp.index, 'high') ?? lp.price;
+    const rpH = candleExt(candles, rp.index, 'high') ?? rp.price;
+    const neck = (lpH + rpH) / 2;
+    const height = neck - hLo;
     if (height < atrVal * 1.3) continue;
-    const broken = price > neck;
+
+    const loAfter = minLowSince(candles, r.index + 1);
+    const invalidated = loAfter < hLo - tol * 0.5;
+    const confirmed = !invalidated && price > neck;
+    const forming = !invalidated && !confirmed && price > hLo;
+    if (!forming && !confirmed) continue;
+    if (forming && last - r.index > 40) continue;
+
     const score =
-      60 +
+      55 +
       Math.min(20, (height / atrVal) * 3) +
-      (broken ? 15 : 0) +
-      (near(lp.price, rp.price, tol * 1.2) ? 8 : 0);
+      (confirmed ? 18 : 6) +
+      (near(lpH, rpH, tol * 1.2) ? 8 : 0);
+
     found.push({
       id: `ihs-${l.index}-${r.index}`,
       key: 'inv_head_shoulders',
       name: 'Épaule-tête-épaule inversée',
       bias: 'haussier',
-      status: broken ? 'cassé (confirmation)' : 'en formation / à surveiller',
-      confidence: Math.min(98, Math.round(score)),
+      confirmed,
+      invalidated: false,
+      status: confirmed ? 'cassé (confirmation)' : 'en formation / à surveiller',
+      confidence: Math.min(96, Math.round(score)),
       neckline: neck,
       target: neck + height,
-      detail: broken
+      detail: confirmed
         ? `Neckline franchie. Objectif potentiel ~${fmtP(neck + height)}.`
         : `Creux central plus bas. Surveillance au-dessus de ${fmtP(neck)}.`,
       points: [
-        node(l.index, l.price, 'ÉG'),
-        node(h.index, h.price, 'T'),
-        node(r.index, r.price, 'ÉD'),
+        node(l.index, lLo, 'ÉG'),
+        node(h.index, hLo, 'T'),
+        node(r.index, rLo, 'ÉD'),
       ],
       silhouette: [
-        node(l.index, l.price),
-        node(lp.index, lp.price),
-        node(h.index, h.price),
-        node(rp.index, rp.price),
-        node(r.index, r.price),
+        node(l.index, lLo),
+        node(lp.index, lpH),
+        node(h.index, hLo),
+        node(rp.index, rpH),
+        node(r.index, rLo),
       ],
-      overlayUpper: [
-        node(lp.index, neck),
-        node(rp.index, neck),
-      ],
+      overlayUpper: [node(lp.index, neck), node(rp.index, neck)],
       overlayLower: null,
       targetLine: null,
     });
@@ -307,16 +394,29 @@ export function detectChartPatterns(candles) {
   const triangle = detectTriangle(candles, rh, rl, atrVal, price, last);
   if (triangle) found.push(triangle);
 
+  // Une seule figure par type, prioriser confirmées puis score
   const byKey = new Map();
   for (const p of found) {
     const prev = byKey.get(p.key);
-    if (!prev || p.confidence > prev.confidence) byKey.set(p.key, p);
+    if (!prev) {
+      byKey.set(p.key, p);
+      continue;
+    }
+    const better =
+      Number(p.confirmed) - Number(prev.confirmed) ||
+      p.confidence - prev.confidence ||
+      (p.silhouette.at(-1)?.index ?? 0) - (prev.silhouette.at(-1)?.index ?? 0);
+    if (better > 0) byKey.set(p.key, p);
   }
 
   return [...byKey.values()]
-    .sort((a, b) => b.confidence - a.confidence)
+    .sort(
+      (a, b) =>
+        Number(b.confirmed) - Number(a.confirmed) ||
+        b.confidence - a.confidence,
+    )
     .slice(0, 3)
-    .map((p) => withProjection(p, last))
+    .map((p) => withProjection(p, candles))
     .map((p) => enrichTimes(p, candles));
 }
 
@@ -365,42 +465,60 @@ function detectTriangle(candles, rh, rl, atrVal, price, last) {
   const span = Math.max(h2.index, l2.index) - Math.min(h1.index, l1.index);
   if (span < 8) return null;
 
-  const upper = (h1.price + h2.price) / 2;
-  const lower = (l1.price + l2.price) / 2;
-  const compressing = Math.abs(h2.price - l2.price) < Math.abs(h1.price - l1.price);
+  const uh1 = candleExt(candles, h1.index, 'high') ?? h1.price;
+  const uh2 = candleExt(candles, h2.index, 'high') ?? h2.price;
+  const ul1 = candleExt(candles, l1.index, 'low') ?? l1.price;
+  const ul2 = candleExt(candles, l2.index, 'low') ?? l2.price;
+  const upper = (uh1 + uh2) / 2;
+  const lower = (ul1 + ul2) / 2;
+  const compressing = Math.abs(uh2 - ul2) < Math.abs(uh1 - ul1);
   if (!compressing && key.includes('triangle')) return null;
 
-  const brokenUp = price > Math.max(h1.price, h2.price);
-  const brokenDown = price < Math.min(l1.price, l2.price);
+  const brokenUp = price > Math.max(uh1, uh2);
+  const brokenDown = price < Math.min(ul1, ul2);
+
+  // Invalidation : cassure dans le sens opposé au biais
+  if (bias === 'haussier' && brokenDown) return null;
+  if (bias === 'baissier' && brokenUp) return null;
+
   let status = 'en formation / compression';
-  if (brokenUp) status = 'cassure haussière';
-  if (brokenDown) status = 'cassure baissière';
+  let confirmed = false;
+  if (brokenUp && bias !== 'baissier') {
+    status = 'cassure haussière';
+    confirmed = true;
+    bias = 'haussier';
+  }
+  if (brokenDown && bias !== 'haussier') {
+    status = 'cassure baissière';
+    confirmed = true;
+    bias = 'baissier';
+  }
+
+  const endIdx = Math.max(h2.index, l2.index);
+  if (!confirmed && last - endIdx > 35) return null;
 
   const score =
-    50 +
+    48 +
     (compressing ? 12 : 0) +
-    (brokenUp || brokenDown ? 18 : 0) +
-    Math.max(0, 10 - (last - Math.max(h2.index, l2.index)) * 0.2);
+    (confirmed ? 18 : 0) +
+    Math.max(0, 10 - (last - endIdx) * 0.2);
 
-  // Silhouette en zigzag H/B/H/B selon l’ordre temporel
   const swings = [
-    node(h1.index, h1.price, 'H1'),
-    node(l1.index, l1.price, 'B1'),
-    node(h2.index, h2.price, 'H2'),
-    node(l2.index, l2.price, 'B2'),
+    node(h1.index, uh1, 'H1'),
+    node(l1.index, ul1, 'B1'),
+    node(h2.index, uh2, 'H2'),
+    node(l2.index, ul2, 'B2'),
   ].sort((a, b) => a.index - b.index);
 
   const height = Math.abs(upper - lower);
   let target = null;
   let neckline = bias === 'haussier' ? upper : lower;
-  if (bias === 'haussier' || brokenUp) {
+  if (bias === 'haussier') {
     target = upper + height;
     neckline = upper;
-    if (bias === 'neutre' && brokenUp) bias = 'haussier';
-  } else if (bias === 'baissier' || brokenDown) {
+  } else if (bias === 'baissier') {
     target = lower - height;
     neckline = lower;
-    if (bias === 'neutre' && brokenDown) bias = 'baissier';
   }
 
   return {
@@ -408,8 +526,10 @@ function detectTriangle(candles, rh, rl, atrVal, price, last) {
     key,
     name,
     bias,
+    confirmed,
+    invalidated: false,
     status,
-    confidence: Math.min(95, Math.round(score)),
+    confidence: Math.min(92, Math.round(score)),
     neckline,
     target,
     detail: target
@@ -417,8 +537,8 @@ function detectTriangle(candles, rh, rl, atrVal, price, last) {
       : `${name} entre ~${fmtP(lower)} et ~${fmtP(upper)}. ${status}.`,
     points: swings,
     silhouette: swings,
-    overlayUpper: [node(h1.index, h1.price), node(h2.index, h2.price)],
-    overlayLower: [node(l1.index, l1.price), node(l2.index, l2.price)],
+    overlayUpper: [node(h1.index, uh1), node(h2.index, uh2)],
+    overlayLower: [node(l1.index, ul1), node(l2.index, ul2)],
     targetLine: null,
   };
 }
