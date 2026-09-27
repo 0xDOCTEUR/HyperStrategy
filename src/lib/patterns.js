@@ -13,50 +13,51 @@ function node(index, price, label) {
 }
 
 /**
- * Prolonge la silhouette jusqu’à l’objectif (cassure + projection),
- * comme sur les fiches chartistes.
+ * Garde la formation intacte, puis ajoute une projection
+ * juste après la figure → neckline → objectif (comme une fiche).
  */
 function withProjection(pattern, last) {
   const target = pattern.target;
   if (target == null || !Number.isFinite(target)) return pattern;
-  const sil = pattern.silhouette;
-  if (!sil?.length) return pattern;
+  const formation = pattern.silhouette;
+  if (!formation?.length) return pattern;
 
-  const first = sil[0];
-  const end = sil[sil.length - 1];
+  const first = formation[0];
+  const end = formation[formation.length - 1];
   const span = Math.max(8, end.index - first.index);
   const neck = pattern.neckline;
-  const bullish = pattern.bias === 'haussier';
-  const bearish = pattern.bias === 'baissier';
+  const broken = /cassé|cassure/i.test(pattern.status || '');
 
-  const proj = [];
+  // Projection collée à la figure (pas étirée jusqu’à aujourd’hui)
+  const proj = [node(end.index, end.price)];
   let cursor = end.index;
 
-  // Point de cassure : neckline juste après la fin de la formation
-  if (neck != null && Number.isFinite(neck)) {
-    const needsBreak =
-      (bullish && end.price < neck - Math.abs(target - neck) * 0.02) ||
-      (bearish && end.price > neck + Math.abs(neck - target) * 0.02);
-    if (needsBreak) {
-      cursor = Math.max(cursor + 2, end.index + Math.max(3, Math.round(span * 0.2)));
-      proj.push(node(cursor, neck, 'Cassure'));
+  if (neck != null && Number.isFinite(neck) && Math.abs(end.price - neck) > Math.abs(target - neck) * 0.05) {
+    cursor = end.index + Math.max(3, Math.round(span * 0.28));
+    proj.push(node(cursor, neck, 'Cassure'));
+  }
+
+  cursor = cursor + Math.max(6, Math.round(span * 0.55));
+  proj.push(node(cursor, target, 'Objectif'));
+
+  // Si la figure est récente, déborde un peu après la dernière bougie
+  // pour laisser voir l’objectif ; sinon reste dans l’historique.
+  if (end.index > last - Math.max(5, Math.round(span * 0.3))) {
+    const overflow = Math.max(4, Math.round(span * 0.35));
+    const lastProj = proj[proj.length - 1];
+    if (lastProj.index <= last) {
+      lastProj.index = last + overflow;
     }
   }
 
-  // Objectif mesuré un peu plus loin dans le temps (peut dépasser la dernière bougie)
-  cursor = Math.max(cursor + Math.max(6, Math.round(span * 0.55)), end.index + Math.max(8, Math.round(span * 0.7)));
-  // Garde un peu d’air après la dernière bougie visible
-  if (cursor <= last) cursor = last + Math.max(4, Math.round(span * 0.35));
-  proj.push(node(cursor, target, 'Objectif'));
-
-  const targetStartIdx = proj[0]?.index ?? end.index;
   return {
     ...pattern,
-    silhouette: [...sil, ...proj],
-    projection: [node(end.index, end.price), ...proj],
+    silhouette: formation,
+    projection: proj,
+    projectionStyle: broken ? 'solid' : 'dashed',
     targetLine: [
-      node(targetStartIdx, target),
-      node(cursor + Math.max(4, Math.round(span * 0.2)), target),
+      node(proj[proj.length - 2]?.index ?? end.index, target),
+      node(proj[proj.length - 1].index + Math.max(2, Math.round(span * 0.12)), target),
     ],
   };
 }
@@ -118,19 +119,18 @@ export function detectChartPatterns(candles) {
           node(trough.index, neck, 'N'),
           node(b.index, b.price, 'S2'),
         ],
-        // Overlay : M complet (descente vers neckline après S2)
+        // Formation M (les 3 pivots) — la projection ajoute la suite
         silhouette: [
           node(a.index, a.price),
           node(trough.index, neck),
           node(b.index, b.price),
-          node(Math.min(last, b.index + Math.max(3, Math.round((b.index - a.index) * 0.25))), neck),
         ],
         overlayUpper: [
           node(a.index, topLevel),
           node(b.index, topLevel),
         ],
         overlayLower: [
-          node(a.index, neck),
+          node(trough.index, neck),
           node(b.index, neck),
         ],
         targetLine: null,
@@ -175,15 +175,14 @@ export function detectChartPatterns(candles) {
           node(peak.index, neck, 'N'),
           node(b.index, b.price, 'C2'),
         ],
-        // Overlay : W complet (remontée vers neckline après C2)
+        // Formation W (les 3 pivots) — la projection ajoute la suite
         silhouette: [
           node(a.index, a.price),
           node(peak.index, neck),
           node(b.index, b.price),
-          node(Math.min(last, b.index + Math.max(3, Math.round((b.index - a.index) * 0.25))), neck),
         ],
         overlayUpper: [
-          node(a.index, neck),
+          node(peak.index, neck),
           node(b.index, neck),
         ],
         overlayLower: [
@@ -240,7 +239,6 @@ export function detectChartPatterns(candles) {
         node(h.index, h.price),
         node(rv.index, rv.price),
         node(r.index, r.price),
-        node(Math.min(last, r.index + Math.max(3, Math.round((r.index - l.index) * 0.2))), neck),
       ],
       overlayUpper: null,
       overlayLower: [
@@ -296,7 +294,6 @@ export function detectChartPatterns(candles) {
         node(h.index, h.price),
         node(rp.index, rp.price),
         node(r.index, r.price),
-        node(Math.min(last, r.index + Math.max(3, Math.round((r.index - l.index) * 0.2))), neck),
       ],
       overlayUpper: [
         node(lp.index, neck),

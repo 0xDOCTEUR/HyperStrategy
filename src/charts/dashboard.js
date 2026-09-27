@@ -192,12 +192,28 @@ export function createDashboardCharts(containers) {
     return '#2f6fed';
   }
 
-  function addOverlayLine(points, { color, width = 3, style = 0, title }) {
-    const data = (points || [])
-      .filter((p) => p.time != null && Number.isFinite(p.price))
-      .sort((a, b) => a.time - b.time)
-      .map((p) => ({ time: p.time, value: p.price }));
+  function addOverlayLine(points, { color, width = 3, style = 0, title = '' }) {
+    // Conserve l’ordre du tracé (pas de tri chrono qui casse un M/W)
+    const data = [];
+    const seen = new Set();
+    for (const p of points || []) {
+      if (p.time == null || !Number.isFinite(p.price)) continue;
+      const key = `${p.time}`;
+      // Évite les doublons de temps (lightweight-charts refuse)
+      if (seen.has(key)) {
+        data[data.length - 1] = { time: p.time, value: p.price };
+        continue;
+      }
+      seen.add(key);
+      data.push({ time: p.time, value: p.price });
+    }
     if (data.length < 2) return;
+    // Vérifie l’ordre croissant des temps
+    for (let i = 1; i < data.length; i++) {
+      if (data[i].time <= data[i - 1].time) {
+        data[i] = { time: data[i - 1].time + 1, value: data[i].value };
+      }
+    }
     const s = priceChart.addSeries(LineSeries, {
       color,
       lineWidth: width,
@@ -205,7 +221,7 @@ export function createDashboardCharts(containers) {
       priceLineVisible: false,
       lastValueVisible: false,
       crosshairMarkerVisible: false,
-      title,
+      title: title || undefined,
     });
     s.setData(data);
     patternSeries.push(s);
@@ -213,10 +229,9 @@ export function createDashboardCharts(containers) {
 
   /**
    * Overlay style fiche chartiste :
-   * - silhouette complète (formation + projection vers l’objectif)
-   * - bordures haute/basse colorées
-   * - jambe de projection accentuée
-   * - objectif en pointillés
+   * - silhouette de formation (M / W / ETE…)
+   * - projection colorée jusqu’à l’objectif
+   * - bordures + objectif en pointillés
    */
   function drawPatterns(patterns = []) {
     clearPatterns();
@@ -224,9 +239,10 @@ export function createDashboardCharts(containers) {
 
     const top = patterns[0];
     const accent = colorForBias(top.bias);
-    const silhouetteColor = 'rgba(28, 36, 43, 0.88)';
+    const silhouetteColor = 'rgba(28, 36, 43, 0.92)';
+    const projDashed = top.projectionStyle === 'dashed';
 
-    // 1) Silhouette complète (formation + projection)
+    // 1) Formation seule
     const sil =
       top.silhouette?.length >= 2
         ? top.silhouette
@@ -238,63 +254,45 @@ export function createDashboardCharts(containers) {
         color: silhouetteColor,
         width: 4,
         style: 0,
-        title: top.name,
       });
     }
 
-    // 2) Jambe de projection colorée (vers l’objectif)
-    const proj =
-      top.projection?.length >= 2
-        ? top.projection
-        : null;
-    if (proj) {
-      addOverlayLine(proj, {
+    // 2) Projection formation → objectif (complète la figure)
+    if (top.projection?.length >= 2) {
+      addOverlayLine(top.projection, {
         color: accent,
         width: 3,
-        style: 0,
-        title: 'Projection',
+        style: projDashed ? 2 : 0,
       });
     }
 
-    // 3) Bordures / canaux (overlay coloré)
+    // 3) Bordures / canaux
     const upper = top.overlayUpper?.length >= 2 ? top.overlayUpper : top.upperLine;
     const lower = top.overlayLower?.length >= 2 ? top.overlayLower : top.lowerLine;
     if (upper) {
-      addOverlayLine(upper, {
-        color: accent,
-        width: 2,
-        style: 0,
-        title: 'Bordure haute',
-      });
+      addOverlayLine(upper, { color: accent, width: 2, style: 0 });
     }
     if (lower) {
-      addOverlayLine(lower, {
-        color: accent,
-        width: 2,
-        style: 0,
-        title: 'Bordure basse',
-      });
+      addOverlayLine(lower, { color: accent, width: 2, style: 0 });
     }
 
-    // Fallback neckline si pas de bordures dédiées
     if (!upper && !lower && top.neckline != null && sil?.length >= 2) {
-      const times = sil.map((p) => p.time).filter(Boolean).sort((a, b) => a - b);
+      const ordered = [...sil].sort((a, b) => a.time - b.time);
       addOverlayLine(
         [
-          { time: times[0], price: top.neckline },
-          { time: times[Math.min(times.length - 1, Math.floor(times.length * 0.7))], price: top.neckline },
+          { time: ordered[0].time, price: top.neckline },
+          { time: ordered[ordered.length - 1].time, price: top.neckline },
         ],
-        { color: accent, width: 2, style: 2, title: 'Neckline' },
+        { color: accent, width: 2, style: 2 },
       );
     }
 
-    // 4) Objectif mesuré (pointillés horizontaux)
+    // 4) Objectif horizontal
     if (top.targetLine?.length >= 2) {
       addOverlayLine(top.targetLine, {
         color: accent,
         width: 2,
         style: 2,
-        title: 'Objectif',
       });
     }
   }
@@ -314,10 +312,10 @@ export function createDashboardCharts(containers) {
     if (!idxs.length) return;
     const min = Math.min(...idxs);
     const max = Math.max(...idxs);
-    const pad = Math.max(10, Math.round((max - min) * 0.25));
-    const from = Math.max(-2, min - pad);
-    // Autorise un peu d’espace « futur » pour voir la projection
-    const to = Math.max(lastBarCount - 1, max) + pad;
+    const padLeft = Math.max(6, Math.round((max - min) * 0.15));
+    const padRight = Math.max(8, Math.round((max - min) * 0.2));
+    const from = Math.max(-2, min - padLeft);
+    const to = Math.max(lastBarCount - 1, max) + padRight;
     const range = { from, to };
     priceChart.timeScale().setVisibleLogicalRange(range);
     rsiChart.timeScale().setVisibleLogicalRange(range);
