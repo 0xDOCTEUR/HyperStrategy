@@ -3,7 +3,6 @@ import {
   CandlestickSeries,
   LineSeries,
   HistogramSeries,
-  createSeriesMarkers,
 } from 'lightweight-charts';
 
 const CHART_OPTS = {
@@ -156,7 +155,6 @@ export function createDashboardCharts(containers) {
 
   const levelLines = [];
   const patternSeries = [];
-  let patternMarkers = null;
 
   function clearLevels() {
     while (levelLines.length) {
@@ -186,135 +184,115 @@ export function createDashboardCharts(containers) {
         /* ignore */
       }
     }
-    if (patternMarkers) {
-      try {
-        patternMarkers.setMarkers([]);
-      } catch {
-        /* ignore */
-      }
-    }
   }
 
   function colorForBias(bias) {
     if (bias === 'haussier') return '#1f8a5b';
     if (bias === 'baissier') return '#c44536';
-    return '#b0893f';
+    return '#2f6fed';
   }
 
+  function addOverlayLine(points, { color, width = 3, style = 0, title }) {
+    const data = (points || [])
+      .filter((p) => p.time != null && Number.isFinite(p.price))
+      .sort((a, b) => a.time - b.time)
+      .map((p) => ({ time: p.time, value: p.price }));
+    if (data.length < 2) return;
+    const s = priceChart.addSeries(LineSeries, {
+      color,
+      lineWidth: width,
+      lineStyle: style,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false,
+      title,
+    });
+    s.setData(data);
+    patternSeries.push(s);
+  }
+
+  /**
+   * Overlay style fiche chartiste :
+   * - silhouette (tracé de la figure)
+   * - bordures haute/basse colorées
+   * - objectif en pointillés
+   * (pas de marqueurs fléchés)
+   */
   function drawPatterns(patterns = []) {
     clearPatterns();
     if (!patterns.length) return;
 
-    if (!patternMarkers) {
-      patternMarkers = createSeriesMarkers(candleSeries, []);
-    }
-
-    const markers = [];
     const top = patterns[0];
-    const color = colorForBias(top.bias);
+    const accent = colorForBias(top.bias);
+    const silhouetteColor = 'rgba(28, 36, 43, 0.88)';
 
-    // Lignes de la figure sélectionnée
-    if (top.upperLine?.length >= 2) {
-      const s = priceChart.addSeries(LineSeries, {
-        color,
-        lineWidth: 2,
-        lineStyle: 2,
-        priceLineVisible: false,
-        lastValueVisible: false,
+    // 1) Silhouette de la figure (tracé principal)
+    const sil =
+      top.silhouette?.length >= 2
+        ? top.silhouette
+        : top.points?.length >= 2
+          ? top.points
+          : null;
+    if (sil) {
+      addOverlayLine(sil, {
+        color: silhouetteColor,
+        width: 4,
+        style: 0,
         title: top.name,
       });
-      s.setData(
-        top.upperLine
-          .filter((p) => p.time != null)
-          .map((p) => ({ time: p.time, value: p.price })),
-      );
-      patternSeries.push(s);
-    }
-    if (top.lowerLine?.length >= 2) {
-      const s = priceChart.addSeries(LineSeries, {
-        color,
-        lineWidth: 2,
-        lineStyle: 2,
-        priceLineVisible: false,
-        lastValueVisible: false,
-      });
-      s.setData(
-        top.lowerLine
-          .filter((p) => p.time != null)
-          .map((p) => ({ time: p.time, value: p.price })),
-      );
-      patternSeries.push(s);
     }
 
-    if (top.points?.length >= 2 && !top.upperLine) {
-      const s = priceChart.addSeries(LineSeries, {
-        color,
-        lineWidth: 2,
-        lineStyle: 0,
-        priceLineVisible: false,
-        lastValueVisible: false,
-        title: top.name,
+    // 2) Bordures / canaux (overlay coloré)
+    const upper = top.overlayUpper?.length >= 2 ? top.overlayUpper : top.upperLine;
+    const lower = top.overlayLower?.length >= 2 ? top.overlayLower : top.lowerLine;
+    if (upper) {
+      addOverlayLine(upper, {
+        color: accent,
+        width: 3,
+        style: 0,
+        title: 'Bordure haute',
       });
-      const pts = [...top.points]
-        .filter((p) => p.time != null)
-        .sort((a, b) => a.time - b.time);
-      s.setData(pts.map((p) => ({ time: p.time, value: p.price })));
-      patternSeries.push(s);
+    }
+    if (lower) {
+      addOverlayLine(lower, {
+        color: accent,
+        width: 3,
+        style: 0,
+        title: 'Bordure basse',
+      });
     }
 
-    if (top.neckPoints?.length >= 2) {
-      const s = priceChart.addSeries(LineSeries, {
-        color: 'rgba(90, 101, 112, 0.85)',
-        lineWidth: 1,
-        lineStyle: 2,
-        priceLineVisible: false,
-        lastValueVisible: false,
-        title: 'Neckline',
-      });
-      s.setData(
-        top.neckPoints
-          .filter((p) => p.time != null)
-          .map((p) => ({ time: p.time, value: p.price })),
+    // Fallback neckline si pas de bordures dédiées
+    if (!upper && !lower && top.neckline != null && sil?.length >= 2) {
+      const times = sil.map((p) => p.time).filter(Boolean).sort((a, b) => a - b);
+      addOverlayLine(
+        [
+          { time: times[0], price: top.neckline },
+          { time: times[times.length - 1], price: top.neckline },
+        ],
+        { color: accent, width: 2, style: 2, title: 'Neckline' },
       );
-      patternSeries.push(s);
-    } else if (top.neckline != null && top.points?.length) {
-      const times = top.points
-        .map((p) => p.time)
-        .filter(Boolean)
-        .sort((a, b) => a - b);
-      if (times.length >= 2) {
-        const s = priceChart.addSeries(LineSeries, {
-          color: 'rgba(90, 101, 112, 0.85)',
-          lineWidth: 1,
-          lineStyle: 2,
-          priceLineVisible: false,
-          lastValueVisible: false,
-          title: 'Neckline',
-        });
-        s.setData([
-          { time: times[0], value: top.neckline },
-          { time: times[times.length - 1], value: top.neckline },
-        ]);
-        patternSeries.push(s);
-      }
     }
 
-    for (const p of top.points || []) {
-      if (p.time == null) continue;
-      markers.push({
-        time: p.time,
-        position: top.bias === 'baissier' ? 'aboveBar' : 'belowBar',
-        color,
-        shape: top.bias === 'baissier' ? 'arrowDown' : 'arrowUp',
-        text: p.label || top.name,
+    // 3) Objectif mesuré (pointillés)
+    if (top.targetLine?.length >= 2) {
+      addOverlayLine(top.targetLine, {
+        color: 'rgba(90, 101, 112, 0.75)',
+        width: 2,
+        style: 2,
+        title: 'Objectif',
       });
     }
-    patternMarkers.setMarkers(markers);
   }
 
   function zoomToPattern(pattern) {
     if (!pattern || !lastBarCount) return;
-    const idxs = (pattern.points || [])
+    const idxs = [
+      ...(pattern.silhouette || []),
+      ...(pattern.points || []),
+      ...(pattern.overlayUpper || []),
+      ...(pattern.overlayLower || []),
+    ]
       .map((p) => p.index)
       .filter((i) => Number.isFinite(i));
     if (!idxs.length) return;

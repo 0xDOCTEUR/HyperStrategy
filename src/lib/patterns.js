@@ -8,9 +8,13 @@ function between(lowsOrHighs, from, to) {
   return lowsOrHighs.filter((p) => p.index > from && p.index < to);
 }
 
+function node(index, price, label) {
+  return { index, price, label };
+}
+
 /**
- * Détecte des figures chartistes classiques à partir des pivots.
- * Retourne les meilleures (récentes + score).
+ * Détecte des figures chartistes et prépare des overlays
+ * (silhouette + bordures + neckline), style fiche chartiste.
  */
 export function detectChartPatterns(candles) {
   if (!candles || candles.length < 40) return [];
@@ -28,7 +32,7 @@ export function detectChartPatterns(candles) {
 
   const found = [];
 
-  // —— Double sommet
+  // —— Double sommet (forme en M)
   for (let i = 0; i < rh.length - 1; i++) {
     for (let j = i + 1; j < rh.length; j++) {
       const a = rh[i];
@@ -37,7 +41,8 @@ export function detectChartPatterns(candles) {
       if (!near(a.price, b.price, tol)) continue;
       const mid = between(rl, a.index, b.index);
       if (!mid.length) continue;
-      const neck = Math.min(...mid.map((p) => p.price));
+      const trough = mid.sort((x, y) => x.price - y.price)[0];
+      const neck = trough.price;
       const height = (a.price + b.price) / 2 - neck;
       if (height < atrVal * 1.1) continue;
       const broken = price < neck;
@@ -46,6 +51,7 @@ export function detectChartPatterns(candles) {
         Math.min(25, (height / atrVal) * 4) +
         (broken ? 15 : 0) +
         Math.max(0, 10 - (last - b.index) * 0.15);
+      const topLevel = (a.price + b.price) / 2;
       found.push({
         id: `dt-${a.index}-${b.index}`,
         key: 'double_top',
@@ -59,15 +65,33 @@ export function detectChartPatterns(candles) {
           ? `Neckline cassée vers ${fmtP(neck)}. Objectif potentiel ~${fmtP(neck - height)}.`
           : `Deux sommets proches. Une clôture sous ${fmtP(neck)} validerait la figure.`,
         points: [
-          { index: a.index, price: a.price, label: 'S1' },
-          { index: mid.sort((x, y) => x.price - y.price)[0].index, price: neck, label: 'N' },
-          { index: b.index, price: b.price, label: 'S2' },
+          node(a.index, a.price, 'S1'),
+          node(trough.index, neck, 'N'),
+          node(b.index, b.price, 'S2'),
+        ],
+        // Overlay : silhouette M + résistance haute + neckline
+        silhouette: [
+          node(a.index, a.price),
+          node(trough.index, neck),
+          node(b.index, b.price),
+        ],
+        overlayUpper: [
+          node(a.index, topLevel),
+          node(b.index, topLevel),
+        ],
+        overlayLower: [
+          node(a.index, neck),
+          node(b.index, neck),
+        ],
+        targetLine: [
+          node(b.index, neck - height),
+          node(Math.min(last, b.index + Math.max(8, b.index - a.index)), neck - height),
         ],
       });
     }
   }
 
-  // —— Double creux
+  // —— Double creux (forme en W)
   for (let i = 0; i < rl.length - 1; i++) {
     for (let j = i + 1; j < rl.length; j++) {
       const a = rl[i];
@@ -76,7 +100,8 @@ export function detectChartPatterns(candles) {
       if (!near(a.price, b.price, tol)) continue;
       const mid = between(rh, a.index, b.index);
       if (!mid.length) continue;
-      const neck = Math.max(...mid.map((p) => p.price));
+      const peak = mid.sort((x, y) => y.price - x.price)[0];
+      const neck = peak.price;
       const height = neck - (a.price + b.price) / 2;
       if (height < atrVal * 1.1) continue;
       const broken = price > neck;
@@ -85,6 +110,7 @@ export function detectChartPatterns(candles) {
         Math.min(25, (height / atrVal) * 4) +
         (broken ? 15 : 0) +
         Math.max(0, 10 - (last - b.index) * 0.15);
+      const botLevel = (a.price + b.price) / 2;
       found.push({
         id: `db-${a.index}-${b.index}`,
         key: 'double_bottom',
@@ -98,15 +124,32 @@ export function detectChartPatterns(candles) {
           ? `Résistance ${fmtP(neck)} franchie. Objectif potentiel ~${fmtP(neck + height)}.`
           : `Deux creux proches. Une clôture au-dessus de ${fmtP(neck)} validerait la figure.`,
         points: [
-          { index: a.index, price: a.price, label: 'C1' },
-          { index: mid.sort((x, y) => y.price - x.price)[0].index, price: neck, label: 'N' },
-          { index: b.index, price: b.price, label: 'C2' },
+          node(a.index, a.price, 'C1'),
+          node(peak.index, neck, 'N'),
+          node(b.index, b.price, 'C2'),
+        ],
+        silhouette: [
+          node(a.index, a.price),
+          node(peak.index, neck),
+          node(b.index, b.price),
+        ],
+        overlayUpper: [
+          node(a.index, neck),
+          node(b.index, neck),
+        ],
+        overlayLower: [
+          node(a.index, botLevel),
+          node(b.index, botLevel),
+        ],
+        targetLine: [
+          node(b.index, neck + height),
+          node(Math.min(last, b.index + Math.max(8, b.index - a.index)), neck + height),
         ],
       });
     }
   }
 
-  // —— Épaule-tête-épaule (3 sommets, milieu plus haut)
+  // —— Épaule-tête-épaule
   for (let i = 0; i < rh.length - 2; i++) {
     const l = rh[i];
     const h = rh[i + 1];
@@ -117,9 +160,9 @@ export function detectChartPatterns(candles) {
     const leftValley = between(rl, l.index, h.index);
     const rightValley = between(rl, h.index, r.index);
     if (!leftValley.length || !rightValley.length) continue;
-    const n1 = Math.min(...leftValley.map((p) => p.price));
-    const n2 = Math.min(...rightValley.map((p) => p.price));
-    const neck = (n1 + n2) / 2;
+    const lv = leftValley.sort((x, y) => x.price - y.price)[0];
+    const rv = rightValley.sort((x, y) => x.price - y.price)[0];
+    const neck = (lv.price + rv.price) / 2;
     const height = h.price - neck;
     if (height < atrVal * 1.3) continue;
     const broken = price < neck;
@@ -127,7 +170,7 @@ export function detectChartPatterns(candles) {
       60 +
       Math.min(20, (height / atrVal) * 3) +
       (broken ? 15 : 0) +
-      (near(n1, n2, tol * 1.2) ? 8 : 0);
+      (near(lv.price, rv.price, tol * 1.2) ? 8 : 0);
     found.push({
       id: `hs-${l.index}-${r.index}`,
       key: 'head_shoulders',
@@ -141,13 +184,25 @@ export function detectChartPatterns(candles) {
         ? `Neckline cassée. Objectif potentiel ~${fmtP(neck - height)}.`
         : `Tête au-dessus des épaules. Surveillance sous ${fmtP(neck)}.`,
       points: [
-        { index: l.index, price: l.price, label: 'ÉG' },
-        { index: h.index, price: h.price, label: 'T' },
-        { index: r.index, price: r.price, label: 'ÉD' },
+        node(l.index, l.price, 'ÉG'),
+        node(h.index, h.price, 'T'),
+        node(r.index, r.price, 'ÉD'),
       ],
-      neckPoints: [
-        { index: leftValley[0].index, price: n1 },
-        { index: rightValley[0].index, price: n2 },
+      silhouette: [
+        node(l.index, l.price),
+        node(lv.index, lv.price),
+        node(h.index, h.price),
+        node(rv.index, rv.price),
+        node(r.index, r.price),
+      ],
+      overlayUpper: null,
+      overlayLower: [
+        node(lv.index, neck),
+        node(rv.index, neck),
+      ],
+      targetLine: [
+        node(r.index, neck - height),
+        node(Math.min(last, r.index + Math.max(10, r.index - l.index)), neck - height),
       ],
     });
   }
@@ -163,9 +218,9 @@ export function detectChartPatterns(candles) {
     const leftPeak = between(rh, l.index, h.index);
     const rightPeak = between(rh, h.index, r.index);
     if (!leftPeak.length || !rightPeak.length) continue;
-    const n1 = Math.max(...leftPeak.map((p) => p.price));
-    const n2 = Math.max(...rightPeak.map((p) => p.price));
-    const neck = (n1 + n2) / 2;
+    const lp = leftPeak.sort((x, y) => y.price - x.price)[0];
+    const rp = rightPeak.sort((x, y) => y.price - x.price)[0];
+    const neck = (lp.price + rp.price) / 2;
     const height = neck - h.price;
     if (height < atrVal * 1.3) continue;
     const broken = price > neck;
@@ -173,7 +228,7 @@ export function detectChartPatterns(candles) {
       60 +
       Math.min(20, (height / atrVal) * 3) +
       (broken ? 15 : 0) +
-      (near(n1, n2, tol * 1.2) ? 8 : 0);
+      (near(lp.price, rp.price, tol * 1.2) ? 8 : 0);
     found.push({
       id: `ihs-${l.index}-${r.index}`,
       key: 'inv_head_shoulders',
@@ -187,22 +242,32 @@ export function detectChartPatterns(candles) {
         ? `Neckline franchie. Objectif potentiel ~${fmtP(neck + height)}.`
         : `Creux central plus bas. Surveillance au-dessus de ${fmtP(neck)}.`,
       points: [
-        { index: l.index, price: l.price, label: 'ÉG' },
-        { index: h.index, price: h.price, label: 'T' },
-        { index: r.index, price: r.price, label: 'ÉD' },
+        node(l.index, l.price, 'ÉG'),
+        node(h.index, h.price, 'T'),
+        node(r.index, r.price, 'ÉD'),
       ],
-      neckPoints: [
-        { index: leftPeak[0].index, price: n1 },
-        { index: rightPeak[0].index, price: n2 },
+      silhouette: [
+        node(l.index, l.price),
+        node(lp.index, lp.price),
+        node(h.index, h.price),
+        node(rp.index, rp.price),
+        node(r.index, r.price),
+      ],
+      overlayUpper: [
+        node(lp.index, neck),
+        node(rp.index, neck),
+      ],
+      overlayLower: null,
+      targetLine: [
+        node(r.index, neck + height),
+        node(Math.min(last, r.index + Math.max(10, r.index - l.index)), neck + height),
       ],
     });
   }
 
-  // —— Triangles (sur 4+ pivots alternés récents)
   const triangle = detectTriangle(candles, rh, rl, atrVal, price, last);
   if (triangle) found.push(triangle);
 
-  // Dédupliquer par type, garder le plus confiant / récent
   const byKey = new Map();
   for (const p of found) {
     const prev = byKey.get(p.key);
@@ -265,8 +330,8 @@ function detectTriangle(candles, rh, rl, atrVal, price, last) {
   const compressing = Math.abs(h2.price - l2.price) < Math.abs(h1.price - l1.price);
   if (!compressing && key.includes('triangle')) return null;
 
-  const brokenUp = price > upper;
-  const brokenDown = price < lower;
+  const brokenUp = price > Math.max(h1.price, h2.price);
+  const brokenDown = price < Math.min(l1.price, l2.price);
   let status = 'en formation / compression';
   if (brokenUp) status = 'cassure haussière';
   if (brokenDown) status = 'cassure baissière';
@@ -276,6 +341,14 @@ function detectTriangle(candles, rh, rl, atrVal, price, last) {
     (compressing ? 12 : 0) +
     (brokenUp || brokenDown ? 18 : 0) +
     Math.max(0, 10 - (last - Math.max(h2.index, l2.index)) * 0.2);
+
+  // Silhouette en zigzag H/B/H/B selon l’ordre temporel
+  const swings = [
+    node(h1.index, h1.price, 'H1'),
+    node(l1.index, l1.price, 'B1'),
+    node(h2.index, h2.price, 'H2'),
+    node(l2.index, l2.price, 'B2'),
+  ].sort((a, b) => a.index - b.index);
 
   return {
     id: `${key}-${h1.index}-${l2.index}`,
@@ -287,32 +360,30 @@ function detectTriangle(candles, rh, rl, atrVal, price, last) {
     neckline: bias === 'haussier' ? upper : lower,
     target: null,
     detail: `${name} entre ~${fmtP(lower)} et ~${fmtP(upper)}. ${status}.`,
-    points: [
-      { index: h1.index, price: h1.price, label: 'H1' },
-      { index: h2.index, price: h2.price, label: 'H2' },
-      { index: l1.index, price: l1.price, label: 'B1' },
-      { index: l2.index, price: l2.price, label: 'B2' },
-    ],
-    upperLine: [
-      { index: h1.index, price: h1.price },
-      { index: h2.index, price: h2.price },
-    ],
-    lowerLine: [
-      { index: l1.index, price: l1.price },
-      { index: l2.index, price: l2.price },
-    ],
+    points: swings,
+    silhouette: swings,
+    overlayUpper: [node(h1.index, h1.price), node(h2.index, h2.price)],
+    overlayLower: [node(l1.index, l1.price), node(l2.index, l2.price)],
+    targetLine: null,
   };
 }
 
 function enrichTimes(pattern, candles) {
   const mapPts = (pts) =>
-    (pts || []).map((p) => ({
-      ...p,
-      time: candles[p.index]?.time,
-    }));
+    (pts || [])
+      .map((p) => ({
+        ...p,
+        time: candles[p.index]?.time,
+      }))
+      .filter((p) => p.time != null);
+
   return {
     ...pattern,
     points: mapPts(pattern.points),
+    silhouette: mapPts(pattern.silhouette),
+    overlayUpper: mapPts(pattern.overlayUpper),
+    overlayLower: mapPts(pattern.overlayLower),
+    targetLine: mapPts(pattern.targetLine),
     neckPoints: mapPts(pattern.neckPoints),
     upperLine: mapPts(pattern.upperLine),
     lowerLine: mapPts(pattern.lowerLine),
