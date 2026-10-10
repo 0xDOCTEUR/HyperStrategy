@@ -5,44 +5,6 @@
       {
         "coin": "BTC",
         "interval": "4h",
-        "at": 1790723724192,
-        "price": 83798,
-        "bias": "range / attentiste",
-        "bullScore": 3,
-        "rsiNow": 50.00537604407031,
-        "goldenCross": true,
-        "deathCross": false,
-        "above50": false,
-        "above200": true,
-        "levels": {
-          "S1": 83797,
-          "S2": 78637.52857142857,
-          "S3": 73477.05714285714,
-          "R1": 85113.33333333333,
-          "R2": 87402,
-          "R3": 94118.94285714286
-        },
-        "long": {
-          "entryLow": 83511.30714285714,
-          "entryHigh": 83798,
-          "tp1": 85113.33333333333,
-          "tp2": 87402,
-          "tp3": 94118.94285714286,
-          "stop": 78637.52857142857
-        },
-        "short": {
-          "entryLow": 84781.65357142857,
-          "entryHigh": 85420.34642857143,
-          "tp1": 83797,
-          "tp2": 78637.52857142857,
-          "tp3": 73477.05714285714,
-          "stop": 87402
-        },
-        "summary": "83,798 entre supports et résistances sans signal dominant. Biais : range / attentiste. Trader les bornes S1 / R1 jusqu’à cassure claire."
-      },
-      {
-        "coin": "BTC",
-        "interval": "4h",
         "at": 1790736428056,
         "price": 83383,
         "bias": "vente sur rebonds",
@@ -1521,47 +1483,47 @@
           "stop": 84965.5
         },
         "summary": "82,565 entre supports et résistances sans signal dominant. Biais : range / attentiste. Trader les bornes S1 / R1 jusqu’à cassure claire."
-      }
-    ],
-    "ETH::4h": [
+      },
       {
-        "coin": "ETH",
+        "coin": "BTC",
         "interval": "4h",
-        "at": 1790723724901,
-        "price": 2688,
-        "bias": "achat sur replis",
-        "bullScore": 5,
-        "rsiNow": 50.190432291765575,
+        "at": 1791627085233,
+        "price": 82779,
+        "bias": "range / attentiste",
+        "bullScore": 3,
+        "rsiNow": 45.024757061129115,
         "goldenCross": true,
         "deathCross": false,
         "above50": false,
         "above200": true,
         "levels": {
-          "S1": 2615.2542857142857,
-          "S2": 2469.7628571428572,
-          "S3": 2251.525714285714,
-          "R1": 2732.75,
-          "R2": 2799.85,
-          "R3": 3124.474285714286
+          "S1": 81384.9,
+          "S2": 78596.7,
+          "S3": 74414.4,
+          "R1": 83500,
+          "R2": 84965.5,
+          "R3": 87139.8
         },
         "long": {
-          "entryLow": 2615.2542857142857,
-          "entryHigh": 2625.357857142857,
-          "tp1": 2732.75,
-          "tp2": 2799.85,
-          "tp3": 3124.474285714286,
-          "stop": 2469.7628571428572
+          "entryLow": 81384.9,
+          "entryHigh": 81578.525,
+          "tp1": 83500,
+          "tp2": 84965.5,
+          "tp3": 87139.8,
+          "stop": 78596.7
         },
         "short": {
-          "entryLow": 2716.437857142857,
-          "entryHigh": 2749.062142857143,
-          "tp1": 2615.2542857142857,
-          "tp2": 2469.7628571428572,
-          "tp3": 2251.525714285714,
-          "stop": 2799.85
+          "entryLow": 83374.75,
+          "entryHigh": 83625.25,
+          "tp1": 81384.9,
+          "tp2": 78596.7,
+          "tp3": 74414.4,
+          "stop": 84965.5
         },
-        "summary": "2,688 tient au-dessus de la pile de moyennes. Structure plutôt haussière. Biais : achat sur replis vers S1. Vente seulement sur rejet de R1."
-      },
+        "summary": "82,779 entre supports et résistances sans signal dominant. Biais : range / attentiste. Trader les bornes S1 / R1 jusqu’à cassure claire."
+      }
+    ],
+    "ETH::4h": [
       {
         "coin": "ETH",
         "interval": "4h",
@@ -3043,47 +3005,47 @@
           "stop": 2736.2833333333333
         },
         "summary": "2,492 sous pression face aux moyennes. Structure plutôt baissière. Biais : vente sur rebonds sous R1. Achat seulement si reprise nette au-dessus de R1."
+      },
+      {
+        "coin": "ETH",
+        "interval": "4h",
+        "at": 1791627086339,
+        "price": 2494,
+        "bias": "range / attentiste",
+        "bullScore": 3,
+        "rsiNow": 35.47624423312023,
+        "goldenCross": true,
+        "deathCross": false,
+        "above50": false,
+        "above200": false,
+        "levels": {
+          "S1": 2436.682857142857,
+          "S2": 2322.048571428571,
+          "S3": 2150.0971428571415,
+          "R1": 2535.0714285714284,
+          "R2": 2736.2833333333333,
+          "R3": 2784.8
+        },
+        "long": {
+          "entryLow": 2436.682857142857,
+          "entryHigh": 2444.6435714285712,
+          "tp1": 2535.0714285714284,
+          "tp2": 2736.2833333333333,
+          "tp3": 2784.8,
+          "stop": 2322.048571428571
+        },
+        "short": {
+          "entryLow": 2514.6235714285717,
+          "entryHigh": 2555.2764285714284,
+          "tp1": 2436.682857142857,
+          "tp2": 2322.048571428571,
+          "tp3": 2150.0971428571415,
+          "stop": 2736.2833333333333
+        },
+        "summary": "2,494 entre supports et résistances sans signal dominant. Biais : range / attentiste. Trader les bornes S1 / R1 jusqu’à cassure claire."
       }
     ],
     "SOL::4h": [
-      {
-        "coin": "SOL",
-        "interval": "4h",
-        "at": 1790723725341,
-        "price": 119.59,
-        "bias": "achat sur replis",
-        "bullScore": 5,
-        "rsiNow": 51.14942545121121,
-        "goldenCross": true,
-        "deathCross": false,
-        "above50": true,
-        "above200": true,
-        "levels": {
-          "S1": 115.30085714285714,
-          "S2": 106.72257142857141,
-          "S3": 93.85514285714282,
-          "R1": 119.95,
-          "R2": 122.94,
-          "R3": 124.95
-        },
-        "long": {
-          "entryLow": 115.30085714285714,
-          "entryHigh": 115.89657142857142,
-          "tp1": 119.95,
-          "tp2": 122.94,
-          "tp3": 124.95,
-          "stop": 106.72257142857141
-        },
-        "short": {
-          "entryLow": 119.59,
-          "entryHigh": 120.44742857142857,
-          "tp1": 115.30085714285714,
-          "tp2": 106.72257142857141,
-          "tp3": 93.85514285714282,
-          "stop": 122.94
-        },
-        "summary": "119.59 tient au-dessus de la pile de moyennes. Structure plutôt haussière. Biais : achat sur replis vers S1. Vente seulement sur rejet de R1."
-      },
       {
         "coin": "SOL",
         "interval": "4h",
@@ -4565,47 +4527,47 @@
           "stop": 122.30799999999999
         },
         "summary": "109.82 sous pression face aux moyennes. Structure plutôt baissière. Biais : vente sur rebonds sous R1. Achat seulement si reprise nette au-dessus de R1."
-      }
-    ],
-    "HYPE::4h": [
+      },
       {
-        "coin": "HYPE",
+        "coin": "SOL",
         "interval": "4h",
-        "at": 1790723725771,
-        "price": 86.451,
-        "bias": "vente sur rebonds",
-        "bullScore": 2,
-        "rsiNow": 38.47145480572908,
+        "at": 1791627086769,
+        "price": 109.56,
+        "bias": "range / attentiste",
+        "bullScore": 3,
+        "rsiNow": 33.50287625978933,
         "goldenCross": true,
         "deathCross": false,
         "above50": false,
-        "above200": true,
+        "above200": false,
         "levels": {
-          "S1": 82.77501428571428,
-          "S2": 75.42304285714286,
-          "S3": 64.39508571428571,
-          "R1": 86.882,
-          "R2": 94.299,
-          "R3": 97.999
+          "S1": 105.98057142857142,
+          "S2": 98.82171428571428,
+          "S3": 88.08342857142856,
+          "R1": 111.45500000000001,
+          "R2": 119.95,
+          "R3": 122.30799999999999
         },
         "long": {
-          "entryLow": 82.77501428571428,
-          "entryHigh": 83.28556785714285,
-          "tp1": 86.882,
-          "tp2": 94.299,
-          "tp3": 97.999,
-          "stop": 75.42304285714286
+          "entryLow": 105.98057142857142,
+          "entryHigh": 106.47771428571428,
+          "tp1": 111.45500000000001,
+          "tp2": 119.95,
+          "tp3": 122.30799999999999,
+          "stop": 98.82171428571428
         },
         "short": {
-          "entryLow": 86.451,
-          "entryHigh": 87.34333214285715,
-          "tp1": 82.77501428571428,
-          "tp2": 75.42304285714286,
-          "tp3": 64.39508571428571,
-          "stop": 94.299
+          "entryLow": 110.6317142857143,
+          "entryHigh": 112.27828571428572,
+          "tp1": 105.98057142857142,
+          "tp2": 98.82171428571428,
+          "tp3": 88.08342857142856,
+          "stop": 119.95
         },
-        "summary": "86.45 sous pression face aux moyennes. Structure plutôt baissière. Biais : vente sur rebonds sous R1. Achat seulement si reprise nette au-dessus de R1."
-      },
+        "summary": "109.56 entre supports et résistances sans signal dominant. Biais : range / attentiste. Trader les bornes S1 / R1 jusqu’à cassure claire."
+      }
+    ],
+    "HYPE::4h": [
       {
         "coin": "HYPE",
         "interval": "4h",
@@ -6087,6 +6049,44 @@
           "stop": 91.733
         },
         "summary": "84.07 sous pression face aux moyennes. Structure plutôt baissière. Biais : vente sur rebonds sous R1. Achat seulement si reprise nette au-dessus de R1."
+      },
+      {
+        "coin": "HYPE",
+        "interval": "4h",
+        "at": 1791627087195,
+        "price": 84.012,
+        "bias": "vente sur rebonds",
+        "bullScore": 2,
+        "rsiNow": 37.251833986226764,
+        "goldenCross": true,
+        "deathCross": false,
+        "above50": false,
+        "above200": false,
+        "levels": {
+          "S1": 81.44378571428571,
+          "S2": 76.30735714285713,
+          "S3": 68.60271428571427,
+          "R1": 86.75466666666667,
+          "R2": 91.733,
+          "R3": 95.74600000000001
+        },
+        "long": {
+          "entryLow": 81.44378571428571,
+          "entryHigh": 81.80048214285713,
+          "tp1": 86.75466666666667,
+          "tp2": 91.733,
+          "tp3": 95.74600000000001,
+          "stop": 76.30735714285713
+        },
+        "short": {
+          "entryLow": 86.28598214285714,
+          "entryHigh": 87.25101785714287,
+          "tp1": 81.44378571428571,
+          "tp2": 76.30735714285713,
+          "tp3": 68.60271428571427,
+          "stop": 91.733
+        },
+        "summary": "84.01 sous pression face aux moyennes. Structure plutôt baissière. Biais : vente sur rebonds sous R1. Achat seulement si reprise nette au-dessus de R1."
       }
     ]
   }
